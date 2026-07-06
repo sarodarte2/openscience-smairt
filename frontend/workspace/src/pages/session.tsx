@@ -551,7 +551,7 @@ function CenterTabStrip(props: { chatTitle: string }): JSX.Element {
         display: "flex",
         "align-items": "stretch",
         gap: "5px",
-        padding: "8px 12px",
+        padding: "7px 10px",
         "border-bottom": "1px solid var(--color-border)",
         background: "var(--color-bg-subtle)",
         "overflow-x": "auto",
@@ -808,7 +808,7 @@ function SessionsSidebar(props: {
       <div
         style={{
           ...sectionTitle,
-          padding: "0 16px 6px",
+          padding: "0 14px 6px",
         }}
       >
         sessions · {props.sessions.length}
@@ -902,7 +902,7 @@ function SessionRow(props: {
           "font-size": "10px",
           color: "var(--color-text-faint)",
           "letter-spacing": "0.04em",
-          "padding-left": "16px",
+          "padding-left": "17px",
         }}
       >
         {props.session.time?.updated ? DateTime.fromMillis(props.session.time.updated).toRelative() : "—"}
