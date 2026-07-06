@@ -6,6 +6,26 @@ All notable changes to OpenScience are recorded here. The project follows
 [`@synsci/openscience`](https://www.npmjs.com/package/@synsci/openscience); each
 tagged release also ships native binaries for Linux, macOS, and Windows.
 
+## v1.2.7 — 2026-07-06
+
+### Fixed
+
+- The `initialize-atlas-graph` system skill — invoked by the canvas and the
+  research agent — now resolves in every install. Released builds load skills
+  from the Atlas catalog, which omitted it, so it failed with "Skill not found"
+  outside a source checkout; it is now embedded and materialized locally when the
+  catalog lacks it.
+
+### Changed
+
+- In-project workspace polish: on-scale typography (hero heading, chat-markdown,
+  tabs), a tighter header, unified sidebar and tab alignment, and corrected
+  muted-text tokens that had rendered at full strength.
+- Landing page: structured data (JSON-LD) for search engines and async image
+  decoding.
+- Docs: a changelog, release-process and verification notes, a skills reference,
+  and a supported-versions security policy.
+
 ## v1.2.6 — 2026-07-06
 
 Atlas experience polish.
