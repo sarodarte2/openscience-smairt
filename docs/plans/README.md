@@ -23,8 +23,11 @@ Nothing irreversible ships without owner sign-off — **sandboxing (10) is desig
 | 9   | arXiv fetching                 | [09-arxiv-retrieval.md](09-arxiv-retrieval.md)             | fix                     | 📝     |
 | 10  | Agent sandboxing (design only) | [10-agent-sandboxing.md](10-agent-sandboxing.md)           | design — needs sign-off | 📝     |
 | 11  | Reviewer agent + open ideas    | [11-reviewer-agent.md](11-reviewer-agent.md)               | prototype/spec          | 📝     |
+| 12  | SMAIRT integration roadmap     | [12-smairt-integration.md](12-smairt-integration.md)       | feature roadmap (multi-phase) | 📝     |
 
 Status: 🔎 exploring · 📝 plan drafted · 🚧 implementing · ✅ done · ⛔ blocked on owner decision.
+
+> **Note:** WS 1–11 were the v1.2.6 Atlas-polish sprint (see note above). WS 12 is a separate, later roadmap — bringing SMAIRT's project-level rigor into OpenScience — with its own phasing (WS-A…WS-G) and an adversarial-review revision log. It also adds two agent-facing repo maps: [`docs/notes/repo-map.md`](../notes/repo-map.md) and `smairt-template/REPO_MAP.md`.
 
 ## Landed so far (implementation)
 
