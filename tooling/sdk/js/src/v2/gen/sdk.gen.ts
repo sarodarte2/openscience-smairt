@@ -116,11 +116,19 @@ import type {
   QuestionRejectResponses,
   QuestionReplyErrors,
   QuestionReplyResponses,
+  ResearchAnalysisCreateResponses,
+  ResearchAnalysisListResponses,
+  ResearchArtifactListResponses,
+  ResearchArtifactRegisterResponses,
+  ResearchClaimCreateResponses,
+  ResearchClaimListResponses,
   ResearchEnvironmentIsolateErrors,
   ResearchEnvironmentIsolateResponses,
   ResearchEnvironmentListResponses,
   ResearchInitializeErrors,
   ResearchInitializeResponses,
+  ResearchIntegrationEvidenceResponses,
+  ResearchIntegrationListResponses,
   ResearchIterationCreateErrors,
   ResearchIterationCreateResponses,
   ResearchIterationListResponses,
@@ -128,6 +136,8 @@ import type {
   ResearchProtocolFreezeErrors,
   ResearchProtocolFreezeResponses,
   ResearchProtocolListResponses,
+  ResearchReviewCreateResponses,
+  ResearchReviewListResponses,
   ResearchRunDeclareErrors,
   ResearchRunDeclareResponses,
   ResearchRunExecuteErrors,
@@ -4178,6 +4188,385 @@ export class Run extends HeyApiClient {
   }
 }
 
+export class Artifact extends HeyApiClient {
+  /**
+   * List registered research artifacts
+   */
+  public list<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      iterationId?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "iterationId" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<ResearchArtifactListResponses, unknown, ThrowOnError>({
+      url: "/research/artifacts",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Hash and register a project-local artifact
+   */
+  public register<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      iterationId?: string
+      file?: string
+      role?: "input" | "output" | "dataset" | "model" | "figure" | "table" | "notebook" | "log" | "other"
+      mediaType?: string
+      runId?: string
+      passphrase?: string
+      humanConfirmed?: true
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "body", key: "iterationId" },
+            { in: "body", key: "file" },
+            { in: "body", key: "role" },
+            { in: "body", key: "mediaType" },
+            { in: "body", key: "runId" },
+            { in: "body", key: "passphrase" },
+            { in: "body", key: "humanConfirmed" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<ResearchArtifactRegisterResponses, unknown, ThrowOnError>({
+      url: "/research/artifacts",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+}
+
+export class Analysis extends HeyApiClient {
+  /**
+   * List scientific analyses
+   */
+  public list<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      iterationId?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "iterationId" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<ResearchAnalysisListResponses, unknown, ThrowOnError>({
+      url: "/research/analyses",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Create a traceable scientific analysis
+   */
+  public create<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      iterationId?: string
+      title?: string
+      summary?: string
+      methods?: string
+      findings?: Array<string>
+      limitations?: Array<string>
+      runIds?: Array<string>
+      artifactIds?: Array<string>
+      finalize?: boolean
+      passphrase?: string
+      humanConfirmed?: true
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "body", key: "iterationId" },
+            { in: "body", key: "title" },
+            { in: "body", key: "summary" },
+            { in: "body", key: "methods" },
+            { in: "body", key: "findings" },
+            { in: "body", key: "limitations" },
+            { in: "body", key: "runIds" },
+            { in: "body", key: "artifactIds" },
+            { in: "body", key: "finalize" },
+            { in: "body", key: "passphrase" },
+            { in: "body", key: "humanConfirmed" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<ResearchAnalysisCreateResponses, unknown, ThrowOnError>({
+      url: "/research/analyses",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+}
+
+export class Claim extends HeyApiClient {
+  /**
+   * List scientific claims
+   */
+  public list<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      iterationId?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "iterationId" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<ResearchClaimListResponses, unknown, ThrowOnError>({
+      url: "/research/claims",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Create or finalize an evidence-backed claim
+   */
+  public create<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      iterationId?: string
+      statement?: string
+      scope?: string
+      uncertainties?: Array<string>
+      analysisIds?: Array<string>
+      artifactIds?: Array<string>
+      finalize?: boolean
+      passphrase?: string
+      humanConfirmed?: true
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "body", key: "iterationId" },
+            { in: "body", key: "statement" },
+            { in: "body", key: "scope" },
+            { in: "body", key: "uncertainties" },
+            { in: "body", key: "analysisIds" },
+            { in: "body", key: "artifactIds" },
+            { in: "body", key: "finalize" },
+            { in: "body", key: "passphrase" },
+            { in: "body", key: "humanConfirmed" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<ResearchClaimCreateResponses, unknown, ThrowOnError>({
+      url: "/research/claims",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+}
+
+export class Review extends HeyApiClient {
+  /**
+   * List signed track reviews
+   */
+  public list<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      trackId?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "trackId" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<ResearchReviewListResponses, unknown, ThrowOnError>({
+      url: "/research/reviews",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Record an explicit human track review
+   */
+  public create<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      trackId?: string
+      claimIds?: Array<string>
+      analysisIds?: Array<string>
+      outcome?: "accepted" | "not_selected" | "inconclusive" | "return_for_changes"
+      rationale?: string
+      passphrase?: string
+      humanConfirmed?: true
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "body", key: "trackId" },
+            { in: "body", key: "claimIds" },
+            { in: "body", key: "analysisIds" },
+            { in: "body", key: "outcome" },
+            { in: "body", key: "rationale" },
+            { in: "body", key: "passphrase" },
+            { in: "body", key: "humanConfirmed" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<ResearchReviewCreateResponses, unknown, ThrowOnError>({
+      url: "/research/reviews",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+}
+
+export class Integration extends HeyApiClient {
+  /**
+   * List evidence-only integrations
+   */
+  public list<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      trackId?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "trackId" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<ResearchIntegrationListResponses, unknown, ThrowOnError>({
+      url: "/research/integrations",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Integrate reviewed evidence without changing code
+   */
+  public evidence<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      reviewId?: string
+      passphrase?: string
+      humanConfirmed?: true
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "body", key: "reviewId" },
+            { in: "body", key: "passphrase" },
+            { in: "body", key: "humanConfirmed" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<ResearchIntegrationEvidenceResponses, unknown, ThrowOnError>({
+      url: "/research/integrations/evidence",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+}
+
 export class Research extends HeyApiClient {
   /**
    * Get OpenScience Research status
@@ -4277,6 +4666,31 @@ export class Research extends HeyApiClient {
   private _run?: Run
   get run(): Run {
     return (this._run ??= new Run({ client: this.client }))
+  }
+
+  private _artifact?: Artifact
+  get artifact(): Artifact {
+    return (this._artifact ??= new Artifact({ client: this.client }))
+  }
+
+  private _analysis?: Analysis
+  get analysis(): Analysis {
+    return (this._analysis ??= new Analysis({ client: this.client }))
+  }
+
+  private _claim?: Claim
+  get claim(): Claim {
+    return (this._claim ??= new Claim({ client: this.client }))
+  }
+
+  private _review?: Review
+  get review(): Review {
+    return (this._review ??= new Review({ client: this.client }))
+  }
+
+  private _integration?: Integration
+  get integration(): Integration {
+    return (this._integration ??= new Integration({ client: this.client }))
   }
 }
 

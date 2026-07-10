@@ -721,6 +721,19 @@ export type EventResearchRunUpdated = {
   }
 }
 
+export type EventResearchEvidenceUpdated = {
+  type: "research.evidence.updated"
+  properties: {
+    version: 1
+    projectId: string
+    subjectType: "artifact" | "analysis"
+    subjectId: string
+    eventId: string
+    action: "registered" | "created" | "finalized"
+    replayed: boolean
+  }
+}
+
 export type EventResearchApprovalRequested = {
   type: "research.approval.requested"
   properties: {
@@ -936,6 +949,7 @@ export type Event =
   | EventResearchTrackUpdated
   | EventResearchIterationUpdated
   | EventResearchRunUpdated
+  | EventResearchEvidenceUpdated
   | EventResearchApprovalRequested
   | EventResearchAuditUpdated
   | EventMcpToolsChanged
@@ -7055,6 +7069,474 @@ export type ResearchRunExecuteResponses = {
 }
 
 export type ResearchRunExecuteResponse = ResearchRunExecuteResponses[keyof ResearchRunExecuteResponses]
+
+export type ResearchArtifactListData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+    iterationId?: string
+  }
+  url: "/research/artifacts"
+}
+
+export type ResearchArtifactListResponses = {
+  /**
+   * Artifact manifests
+   */
+  200: Array<{
+    schemaVersion: 1
+    projectId: string
+    createdAt: string
+    createdBy: {
+      kind: "human" | "agent" | "system"
+      id: string
+      displayName: string
+      delegationId?: string
+    }
+    id: string
+    iterationId: string
+    runId: string | null
+    path: string
+    role: "input" | "output" | "dataset" | "model" | "figure" | "table" | "notebook" | "log" | "other"
+    mediaType: string
+    byteLength: number
+    contentHash: string
+    captureConfidence: "complete" | "best_effort"
+  }>
+}
+
+export type ResearchArtifactListResponse = ResearchArtifactListResponses[keyof ResearchArtifactListResponses]
+
+export type ResearchArtifactRegisterData = {
+  body?: {
+    iterationId: string
+    file: string
+    role: "input" | "output" | "dataset" | "model" | "figure" | "table" | "notebook" | "log" | "other"
+    mediaType: string
+    runId?: string
+    passphrase?: string
+    humanConfirmed: true
+  }
+  path?: never
+  query?: {
+    directory?: string
+  }
+  url: "/research/artifacts"
+}
+
+export type ResearchArtifactRegisterResponses = {
+  /**
+   * Signed artifact manifest
+   */
+  200: {
+    artifact: {
+      schemaVersion: 1
+      projectId: string
+      createdAt: string
+      createdBy: {
+        kind: "human" | "agent" | "system"
+        id: string
+        displayName: string
+        delegationId?: string
+      }
+      id: string
+      iterationId: string
+      runId: string | null
+      path: string
+      role: "input" | "output" | "dataset" | "model" | "figure" | "table" | "notebook" | "log" | "other"
+      mediaType: string
+      byteLength: number
+      contentHash: string
+      captureConfidence: "complete" | "best_effort"
+    }
+    eventId: string
+  }
+}
+
+export type ResearchArtifactRegisterResponse =
+  ResearchArtifactRegisterResponses[keyof ResearchArtifactRegisterResponses]
+
+export type ResearchAnalysisListData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+    iterationId?: string
+  }
+  url: "/research/analyses"
+}
+
+export type ResearchAnalysisListResponses = {
+  /**
+   * Scientific analyses
+   */
+  200: Array<{
+    schemaVersion: 1
+    projectId: string
+    createdAt: string
+    createdBy: {
+      kind: "human" | "agent" | "system"
+      id: string
+      displayName: string
+      delegationId?: string
+    }
+    id: string
+    iterationId: string
+    title: string
+    summary: string
+    methods: string
+    findings: Array<string>
+    limitations: Array<string>
+    runIds: Array<string>
+    artifactIds: Array<string>
+    state: "draft" | "finalized"
+    finalizedAt: string | null
+  }>
+}
+
+export type ResearchAnalysisListResponse = ResearchAnalysisListResponses[keyof ResearchAnalysisListResponses]
+
+export type ResearchAnalysisCreateData = {
+  body?: {
+    iterationId: string
+    title: string
+    summary: string
+    methods: string
+    findings: Array<string>
+    limitations: Array<string>
+    runIds: Array<string>
+    artifactIds: Array<string>
+    finalize?: boolean
+    passphrase?: string
+    humanConfirmed: true
+  }
+  path?: never
+  query?: {
+    directory?: string
+  }
+  url: "/research/analyses"
+}
+
+export type ResearchAnalysisCreateResponses = {
+  /**
+   * Signed analysis
+   */
+  200: {
+    analysis: {
+      schemaVersion: 1
+      projectId: string
+      createdAt: string
+      createdBy: {
+        kind: "human" | "agent" | "system"
+        id: string
+        displayName: string
+        delegationId?: string
+      }
+      id: string
+      iterationId: string
+      title: string
+      summary: string
+      methods: string
+      findings: Array<string>
+      limitations: Array<string>
+      runIds: Array<string>
+      artifactIds: Array<string>
+      state: "draft" | "finalized"
+      finalizedAt: string | null
+    }
+    eventId: string
+  }
+}
+
+export type ResearchAnalysisCreateResponse = ResearchAnalysisCreateResponses[keyof ResearchAnalysisCreateResponses]
+
+export type ResearchClaimListData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+    iterationId?: string
+  }
+  url: "/research/claims"
+}
+
+export type ResearchClaimListResponses = {
+  /**
+   * Scientific claims
+   */
+  200: Array<{
+    schemaVersion: 1
+    projectId: string
+    createdAt: string
+    createdBy: {
+      kind: "human" | "agent" | "system"
+      id: string
+      displayName: string
+      delegationId?: string
+    }
+    id: string
+    iterationId: string
+    statement: string
+    scope: string
+    uncertainties: Array<string>
+    analysisIds: Array<string>
+    artifactIds: Array<string>
+    state: "draft" | "finalized" | "superseded"
+    finalizedAt: string | null
+  }>
+}
+
+export type ResearchClaimListResponse = ResearchClaimListResponses[keyof ResearchClaimListResponses]
+
+export type ResearchClaimCreateData = {
+  body?: {
+    iterationId: string
+    statement: string
+    scope: string
+    uncertainties: Array<string>
+    analysisIds: Array<string>
+    artifactIds: Array<string>
+    finalize?: boolean
+    passphrase?: string
+    humanConfirmed: true
+  }
+  path?: never
+  query?: {
+    directory?: string
+  }
+  url: "/research/claims"
+}
+
+export type ResearchClaimCreateResponses = {
+  /**
+   * Signed claim
+   */
+  200: {
+    claim: {
+      schemaVersion: 1
+      projectId: string
+      createdAt: string
+      createdBy: {
+        kind: "human" | "agent" | "system"
+        id: string
+        displayName: string
+        delegationId?: string
+      }
+      id: string
+      iterationId: string
+      statement: string
+      scope: string
+      uncertainties: Array<string>
+      analysisIds: Array<string>
+      artifactIds: Array<string>
+      state: "draft" | "finalized" | "superseded"
+      finalizedAt: string | null
+    }
+    eventId: string
+  }
+}
+
+export type ResearchClaimCreateResponse = ResearchClaimCreateResponses[keyof ResearchClaimCreateResponses]
+
+export type ResearchReviewListData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+    trackId?: string
+  }
+  url: "/research/reviews"
+}
+
+export type ResearchReviewListResponses = {
+  /**
+   * Track reviews
+   */
+  200: Array<{
+    schemaVersion: 1
+    projectId: string
+    createdAt: string
+    createdBy: {
+      kind: "human" | "agent" | "system"
+      id: string
+      displayName: string
+      delegationId?: string
+    }
+    id: string
+    trackId: string
+    claimIds: Array<string>
+    analysisIds: Array<string>
+    outcome: "accepted" | "not_selected" | "inconclusive" | "return_for_changes"
+    rationale: string
+    reviewedAt: string
+  }>
+}
+
+export type ResearchReviewListResponse = ResearchReviewListResponses[keyof ResearchReviewListResponses]
+
+export type ResearchReviewCreateData = {
+  body?: {
+    trackId: string
+    claimIds: Array<string>
+    analysisIds: Array<string>
+    outcome: "accepted" | "not_selected" | "inconclusive" | "return_for_changes"
+    rationale: string
+    passphrase?: string
+    humanConfirmed: true
+  }
+  path?: never
+  query?: {
+    directory?: string
+  }
+  url: "/research/reviews"
+}
+
+export type ResearchReviewCreateResponses = {
+  /**
+   * Signed review decision
+   */
+  200: {
+    review: {
+      schemaVersion: 1
+      projectId: string
+      createdAt: string
+      createdBy: {
+        kind: "human" | "agent" | "system"
+        id: string
+        displayName: string
+        delegationId?: string
+      }
+      id: string
+      trackId: string
+      claimIds: Array<string>
+      analysisIds: Array<string>
+      outcome: "accepted" | "not_selected" | "inconclusive" | "return_for_changes"
+      rationale: string
+      reviewedAt: string
+    }
+    track: {
+      schemaVersion: 1
+      projectId: string
+      createdAt: string
+      createdBy: {
+        kind: "human" | "agent" | "system"
+        id: string
+        displayName: string
+        delegationId?: string
+      }
+      id: string
+      alias: string
+      title: string
+      objective: string
+      state:
+        | "draft"
+        | "active"
+        | "review_ready"
+        | "accepted"
+        | "not_selected"
+        | "inconclusive"
+        | "abandoned"
+        | "superseded"
+        | "synthesized"
+      hidden?: boolean
+      parentTrackIds: Array<string>
+      supersedesTrackId?: string
+    }
+    eventId: string
+  }
+}
+
+export type ResearchReviewCreateResponse = ResearchReviewCreateResponses[keyof ResearchReviewCreateResponses]
+
+export type ResearchIntegrationListData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+    trackId?: string
+  }
+  url: "/research/integrations"
+}
+
+export type ResearchIntegrationListResponses = {
+  /**
+   * Evidence integrations
+   */
+  200: Array<{
+    schemaVersion: 1
+    projectId: string
+    createdAt: string
+    createdBy: {
+      kind: "human" | "agent" | "system"
+      id: string
+      displayName: string
+      delegationId?: string
+    }
+    id: string
+    sourceTrackId: string
+    reviewId: string
+    mode: "evidence_only"
+    sourceBranch: string
+    sourceCommit: string | null
+    baseFoundationId: string | null
+    claimIds: Array<string>
+    analysisIds: Array<string>
+    artifactIds: Array<string>
+    supportingEventIds: Array<string>
+    bundleHash: string
+  }>
+}
+
+export type ResearchIntegrationListResponse = ResearchIntegrationListResponses[keyof ResearchIntegrationListResponses]
+
+export type ResearchIntegrationEvidenceData = {
+  body?: {
+    reviewId: string
+    passphrase?: string
+    humanConfirmed: true
+  }
+  path?: never
+  query?: {
+    directory?: string
+  }
+  url: "/research/integrations/evidence"
+}
+
+export type ResearchIntegrationEvidenceResponses = {
+  /**
+   * Signed evidence-only integration
+   */
+  200: {
+    integration: {
+      schemaVersion: 1
+      projectId: string
+      createdAt: string
+      createdBy: {
+        kind: "human" | "agent" | "system"
+        id: string
+        displayName: string
+        delegationId?: string
+      }
+      id: string
+      sourceTrackId: string
+      reviewId: string
+      mode: "evidence_only"
+      sourceBranch: string
+      sourceCommit: string | null
+      baseFoundationId: string | null
+      claimIds: Array<string>
+      analysisIds: Array<string>
+      artifactIds: Array<string>
+      supportingEventIds: Array<string>
+      bundleHash: string
+    }
+    eventId: string
+  }
+}
+
+export type ResearchIntegrationEvidenceResponse =
+  ResearchIntegrationEvidenceResponses[keyof ResearchIntegrationEvidenceResponses]
 
 export type InstanceDisposeData = {
   body?: never

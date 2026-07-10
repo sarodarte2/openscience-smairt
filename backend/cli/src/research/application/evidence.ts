@@ -90,6 +90,30 @@ async function ensureReferences(
 }
 
 export namespace ResearchEvidenceService {
+  export async function listArtifacts(projectRoot: string, iterationId?: string) {
+    const git = await LocalGit.inspect(projectRoot)
+    const directory = path.join(git.root, ".openscience/research/artifacts")
+    const names = await readdir(directory).catch(() => [])
+    const values = await Promise.all(
+      names
+        .filter((name) => name.endsWith(".json"))
+        .map((name) => load(path.join(directory, name), ArtifactManifest.parse)),
+    )
+    return values.filter((value) => !iterationId || value.iterationId === iterationId)
+  }
+
+  export async function listAnalyses(projectRoot: string, iterationId?: string) {
+    const git = await LocalGit.inspect(projectRoot)
+    const directory = path.join(git.root, ".openscience/research/analyses")
+    const names = await readdir(directory).catch(() => [])
+    const values = await Promise.all(
+      names
+        .filter((name) => name.endsWith(".json"))
+        .map((name) => load(path.join(directory, name), ScientificAnalysis.parse)),
+    )
+    return values.filter((value) => !iterationId || value.iterationId === iterationId)
+  }
+
   export async function registerArtifact(
     input: Authorization & {
       projectRoot: string

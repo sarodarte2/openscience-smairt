@@ -21,6 +21,11 @@ import {
   ResearchProject,
   ResearchTrack,
   RunAttempt,
+  ArtifactManifest,
+  ScientificAnalysis,
+  ScientificClaim,
+  TrackReview,
+  EvidenceIntegration,
   TrackEnvironment,
   WorkspaceBinding,
 } from "../../research/domain/schema"
@@ -32,6 +37,8 @@ import { InvestigationService } from "../../research/application/investigation"
 import { ResearchAuthorizationError } from "../../research/domain/governance"
 import { NotebookValidationError, ResearchRunService, RunStateError } from "../../research/application/run"
 import { ResearchEnvironmentService } from "../../research/application/environment"
+import { ResearchEvidenceService } from "../../research/application/evidence"
+import { ResearchReviewService } from "../../research/application/review"
 
 const Status = z.discriminatedUnion("initialized", [
   z.object({ initialized: z.literal(false), root: z.string() }),
@@ -132,6 +139,58 @@ const ExecuteRun = z.object({
 })
 
 const IsolateEnvironment = z.object({
+  passphrase: z.string().min(12).optional(),
+  humanConfirmed: z.literal(true),
+})
+
+const RegisterArtifact = z.object({
+  iterationId: z.string().min(1),
+  file: z.string().min(1).max(8000),
+  role: ArtifactManifest.shape.role,
+  mediaType: z.string().min(1).max(300),
+  runId: z.string().min(1).optional(),
+  passphrase: z.string().min(12).optional(),
+  humanConfirmed: z.literal(true),
+})
+
+const CreateAnalysis = z.object({
+  iterationId: z.string().min(1),
+  title: z.string().min(1).max(300),
+  summary: z.string().min(1).max(24000),
+  methods: z.string().min(1).max(24000),
+  findings: z.array(z.string().min(1).max(8000)).min(1),
+  limitations: z.array(z.string().min(1).max(8000)).min(1),
+  runIds: z.array(z.string()),
+  artifactIds: z.array(z.string()),
+  finalize: z.boolean().default(false),
+  passphrase: z.string().min(12).optional(),
+  humanConfirmed: z.literal(true),
+})
+
+const CreateClaim = z.object({
+  iterationId: z.string().min(1),
+  statement: z.string().min(1).max(12000),
+  scope: z.string().min(1).max(8000),
+  uncertainties: z.array(z.string().min(1).max(8000)).min(1),
+  analysisIds: z.array(z.string()).min(1),
+  artifactIds: z.array(z.string()),
+  finalize: z.boolean().default(false),
+  passphrase: z.string().min(12).optional(),
+  humanConfirmed: z.literal(true),
+})
+
+const ReviewTrack = z.object({
+  trackId: z.string().min(1),
+  claimIds: z.array(z.string()).min(1),
+  analysisIds: z.array(z.string()).min(1),
+  outcome: TrackReview.shape.outcome,
+  rationale: z.string().min(1).max(24000),
+  passphrase: z.string().min(12).optional(),
+  humanConfirmed: z.literal(true),
+})
+
+const IntegrateEvidence = z.object({
+  reviewId: z.string().min(1),
   passphrase: z.string().min(12).optional(),
   humanConfirmed: z.literal(true),
 })
@@ -807,6 +866,268 @@ export const ResearchRoutes = lazy(() =>
           replayed: result.replayed,
         })
         return c.json(result)
+      },
+    )
+    .get(
+      "/artifacts",
+      describeRoute({
+        summary: "List registered research artifacts",
+        operationId: "research.artifact.list",
+        responses: {
+          200: {
+            description: "Artifact manifests",
+            content: { "application/json": { schema: resolver(z.array(ArtifactManifest)) } },
+          },
+        },
+      }),
+      validator("query", z.object({ iterationId: z.string().optional() })),
+      async (c) =>
+        c.json(await ResearchEvidenceService.listArtifacts(Instance.directory, c.req.valid("query").iterationId)),
+    )
+    .post(
+      "/artifacts",
+      describeRoute({
+        summary: "Hash and register a project-local artifact",
+        operationId: "research.artifact.register",
+        responses: {
+          200: {
+            description: "Signed artifact manifest",
+            content: {
+              "application/json": { schema: resolver(z.object({ artifact: ArtifactManifest, eventId: z.string() })) },
+            },
+          },
+        },
+      }),
+      validator("json", RegisterArtifact),
+      async (c) => {
+        const body = c.req.valid("json")
+        const signer = await LocalIdentity.loadOrCreate({ passphrase: body.passphrase })
+        const member = await ProjectMembership.localMember(Instance.directory, signer.keyId)
+        if (!member)
+          throw new HTTPException(403, { message: "The local signing identity is not an active project member" })
+        const result = await ResearchEvidenceService.registerArtifact({
+          projectRoot: Instance.directory,
+          iterationId: body.iterationId,
+          file: body.file,
+          artifactRole: body.role,
+          mediaType: body.mediaType,
+          runId: body.runId,
+          actor: { kind: "human", id: member.id, displayName: member.displayName },
+          role: member.role,
+          signer,
+        })
+        await Bus.publish(ResearchEvents.EvidenceUpdated, {
+          version: 1,
+          projectId: result.artifact.projectId,
+          subjectType: "artifact",
+          subjectId: result.artifact.id,
+          eventId: result.eventId,
+          action: "registered",
+          replayed: false,
+        })
+        return c.json(result)
+      },
+    )
+    .get(
+      "/analyses",
+      describeRoute({
+        summary: "List scientific analyses",
+        operationId: "research.analysis.list",
+        responses: {
+          200: {
+            description: "Scientific analyses",
+            content: { "application/json": { schema: resolver(z.array(ScientificAnalysis)) } },
+          },
+        },
+      }),
+      validator("query", z.object({ iterationId: z.string().optional() })),
+      async (c) =>
+        c.json(await ResearchEvidenceService.listAnalyses(Instance.directory, c.req.valid("query").iterationId)),
+    )
+    .post(
+      "/analyses",
+      describeRoute({
+        summary: "Create a traceable scientific analysis",
+        operationId: "research.analysis.create",
+        responses: {
+          200: {
+            description: "Signed analysis",
+            content: {
+              "application/json": { schema: resolver(z.object({ analysis: ScientificAnalysis, eventId: z.string() })) },
+            },
+          },
+        },
+      }),
+      validator("json", CreateAnalysis),
+      async (c) => {
+        const body = c.req.valid("json")
+        const signer = await LocalIdentity.loadOrCreate({ passphrase: body.passphrase })
+        const member = await ProjectMembership.localMember(Instance.directory, signer.keyId)
+        if (!member)
+          throw new HTTPException(403, { message: "The local signing identity is not an active project member" })
+        const result = await ResearchEvidenceService.createAnalysis({
+          ...body,
+          projectRoot: Instance.directory,
+          actor: { kind: "human", id: member.id, displayName: member.displayName },
+          role: member.role,
+          signer,
+        })
+        await Bus.publish(ResearchEvents.EvidenceUpdated, {
+          version: 1,
+          projectId: result.analysis.projectId,
+          subjectType: "analysis",
+          subjectId: result.analysis.id,
+          eventId: result.eventId,
+          action: result.analysis.state === "finalized" ? "finalized" : "created",
+          replayed: false,
+        })
+        return c.json(result)
+      },
+    )
+    .get(
+      "/claims",
+      describeRoute({
+        summary: "List scientific claims",
+        operationId: "research.claim.list",
+        responses: {
+          200: {
+            description: "Scientific claims",
+            content: { "application/json": { schema: resolver(z.array(ScientificClaim)) } },
+          },
+        },
+      }),
+      validator("query", z.object({ iterationId: z.string().optional() })),
+      async (c) => c.json(await ResearchReviewService.listClaims(Instance.directory, c.req.valid("query").iterationId)),
+    )
+    .post(
+      "/claims",
+      describeRoute({
+        summary: "Create or finalize an evidence-backed claim",
+        operationId: "research.claim.create",
+        responses: {
+          200: {
+            description: "Signed claim",
+            content: {
+              "application/json": { schema: resolver(z.object({ claim: ScientificClaim, eventId: z.string() })) },
+            },
+          },
+        },
+      }),
+      validator("json", CreateClaim),
+      async (c) => {
+        const body = c.req.valid("json")
+        const signer = await LocalIdentity.loadOrCreate({ passphrase: body.passphrase })
+        const member = await ProjectMembership.localMember(Instance.directory, signer.keyId)
+        if (!member)
+          throw new HTTPException(403, { message: "The local signing identity is not an active project member" })
+        return c.json(
+          await ResearchReviewService.createClaim({
+            ...body,
+            projectRoot: Instance.directory,
+            actor: { kind: "human", id: member.id, displayName: member.displayName },
+            role: member.role,
+            signer,
+          }),
+        )
+      },
+    )
+    .get(
+      "/reviews",
+      describeRoute({
+        summary: "List signed track reviews",
+        operationId: "research.review.list",
+        responses: {
+          200: {
+            description: "Track reviews",
+            content: { "application/json": { schema: resolver(z.array(TrackReview)) } },
+          },
+        },
+      }),
+      validator("query", z.object({ trackId: z.string().optional() })),
+      async (c) => c.json(await ResearchReviewService.listReviews(Instance.directory, c.req.valid("query").trackId)),
+    )
+    .post(
+      "/reviews",
+      describeRoute({
+        summary: "Record an explicit human track review",
+        operationId: "research.review.create",
+        responses: {
+          200: {
+            description: "Signed review decision",
+            content: {
+              "application/json": {
+                schema: resolver(z.object({ review: TrackReview, track: ResearchTrack, eventId: z.string() })),
+              },
+            },
+          },
+        },
+      }),
+      validator("json", ReviewTrack),
+      async (c) => {
+        const body = c.req.valid("json")
+        const signer = await LocalIdentity.loadOrCreate({ passphrase: body.passphrase })
+        const member = await ProjectMembership.localMember(Instance.directory, signer.keyId)
+        if (!member)
+          throw new HTTPException(403, { message: "The local signing identity is not an active project member" })
+        return c.json(
+          await ResearchReviewService.reviewTrack({
+            ...body,
+            projectRoot: Instance.directory,
+            actor: { kind: "human", id: member.id, displayName: member.displayName },
+            role: member.role,
+            signer,
+          }),
+        )
+      },
+    )
+    .get(
+      "/integrations",
+      describeRoute({
+        summary: "List evidence-only integrations",
+        operationId: "research.integration.list",
+        responses: {
+          200: {
+            description: "Evidence integrations",
+            content: { "application/json": { schema: resolver(z.array(EvidenceIntegration)) } },
+          },
+        },
+      }),
+      validator("query", z.object({ trackId: z.string().optional() })),
+      async (c) =>
+        c.json(await ResearchReviewService.listIntegrations(Instance.directory, c.req.valid("query").trackId)),
+    )
+    .post(
+      "/integrations/evidence",
+      describeRoute({
+        summary: "Integrate reviewed evidence without changing code",
+        operationId: "research.integration.evidence",
+        responses: {
+          200: {
+            description: "Signed evidence-only integration",
+            content: {
+              "application/json": {
+                schema: resolver(z.object({ integration: EvidenceIntegration, eventId: z.string() })),
+              },
+            },
+          },
+        },
+      }),
+      validator("json", IntegrateEvidence),
+      async (c) => {
+        const body = c.req.valid("json")
+        const signer = await LocalIdentity.loadOrCreate({ passphrase: body.passphrase })
+        const member = await ProjectMembership.localMember(Instance.directory, signer.keyId)
+        if (!member)
+          throw new HTTPException(403, { message: "The local signing identity is not an active project member" })
+        return c.json(
+          await ResearchReviewService.integrateEvidenceOnly({
+            projectRoot: Instance.directory,
+            reviewId: body.reviewId,
+            actor: { kind: "human", id: member.id, displayName: member.displayName },
+            role: member.role,
+            signer,
+          }),
+        )
       },
     ),
 )

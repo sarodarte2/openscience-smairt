@@ -64,6 +64,24 @@ async function iteration(root: string, projectId: string, iterationId: string) {
 }
 
 export namespace ResearchReviewService {
+  export async function listClaims(projectRoot: string, iterationId?: string) {
+    const git = await LocalGit.inspect(projectRoot)
+    const values = await list(path.join(git.root, ".openscience/research/claims"), ScientificClaim.parse)
+    return values.filter((value) => !iterationId || value.iterationId === iterationId)
+  }
+
+  export async function listReviews(projectRoot: string, trackId?: string) {
+    const git = await LocalGit.inspect(projectRoot)
+    const values = await list(path.join(git.root, ".openscience/research/reviews"), TrackReview.parse)
+    return values.filter((value) => !trackId || value.trackId === trackId)
+  }
+
+  export async function listIntegrations(projectRoot: string, trackId?: string) {
+    const git = await LocalGit.inspect(projectRoot)
+    const values = await list(path.join(git.root, ".openscience/research/integrations"), EvidenceIntegration.parse)
+    return values.filter((value) => !trackId || value.sourceTrackId === trackId)
+  }
+
   export async function createClaim(
     input: Authorization & {
       projectRoot: string
