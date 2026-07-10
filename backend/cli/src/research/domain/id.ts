@@ -11,6 +11,8 @@ export const ResearchIDKind = {
   run: "rsr",
   artifact: "rsa",
   analysis: "rsn",
+  review: "rsq",
+  integration: "rsx",
   member: "rsm",
   event: "rse",
   approval: "rsv",

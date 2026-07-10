@@ -241,6 +241,49 @@ export const ScientificAnalysis = RecordBase.extend({
 }).strict()
 export type ScientificAnalysis = z.infer<typeof ScientificAnalysis>
 
+export const ScientificClaim = RecordBase.extend({
+  id: ResearchID.schema("claim"),
+  iterationId: ResearchID.schema("iteration"),
+  statement: z.string().min(1).max(12000),
+  scope: z.string().min(1).max(8000),
+  uncertainties: z.array(z.string().min(1).max(8000)).min(1),
+  analysisIds: z.array(ResearchID.schema("analysis")).min(1),
+  artifactIds: z.array(ResearchID.schema("artifact")),
+  state: z.enum(["draft", "finalized", "superseded"]),
+  finalizedAt: Timestamp.nullable(),
+}).strict()
+export type ScientificClaim = z.infer<typeof ScientificClaim>
+
+export const TrackReview = RecordBase.extend({
+  id: ResearchID.schema("review"),
+  trackId: ResearchID.schema("track"),
+  claimIds: z.array(ResearchID.schema("claim")).min(1),
+  analysisIds: z.array(ResearchID.schema("analysis")).min(1),
+  outcome: z.enum(["accepted", "not_selected", "inconclusive", "return_for_changes"]),
+  rationale: z.string().min(1).max(24000),
+  reviewedAt: Timestamp,
+}).strict()
+export type TrackReview = z.infer<typeof TrackReview>
+
+export const EvidenceIntegration = RecordBase.extend({
+  id: ResearchID.schema("integration"),
+  sourceTrackId: ResearchID.schema("track"),
+  reviewId: ResearchID.schema("review"),
+  mode: z.literal("evidence_only"),
+  sourceBranch: z.string().min(1),
+  sourceCommit: z
+    .string()
+    .regex(/^[0-9a-f]{40,64}$/)
+    .nullable(),
+  baseFoundationId: ResearchID.schema("foundation").nullable(),
+  claimIds: z.array(ResearchID.schema("claim")),
+  analysisIds: z.array(ResearchID.schema("analysis")),
+  artifactIds: z.array(ResearchID.schema("artifact")),
+  supportingEventIds: z.array(ResearchID.schema("event")),
+  bundleHash: Hash,
+}).strict()
+export type EvidenceIntegration = z.infer<typeof EvidenceIntegration>
+
 export const WorkspaceBinding = RecordBase.extend({
   id: ResearchID.schema("workspace"),
   trackId: ResearchID.schema("track"),

@@ -109,12 +109,13 @@ packets:
       - integrated-research-workspace
 
   WP-09-INTEGRATE:
-    status: pending
+    status: partial
     spec: "09"
     depends_on: [WP-04-TRACKS, WP-05-RUNNER, WP-07-API]
     owns:
-      - backend/cli/src/research/application/integrate.ts
-      - backend/cli/test/research/integrate/**
+      - backend/cli/src/research/application/evidence.ts
+      - backend/cli/src/research/application/review.ts
+      - backend/cli/src/research/__tests__/evidence.test.ts
     outputs:
       - evidence-bundles
       - foundation-promotion

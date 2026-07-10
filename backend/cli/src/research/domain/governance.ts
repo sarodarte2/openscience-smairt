@@ -13,6 +13,8 @@ export const ResearchCapability = {
   runCancel: "run.cancel",
   analysisWrite: "analysis.write",
   claimFinalize: "claim.finalize",
+  trackReview: "track.review",
+  evidenceIntegrate: "evidence.integrate",
   foundationPromote: "foundation.promote",
   exportCreate: "export.create",
   overrideGate: "gate.override",
@@ -33,12 +35,16 @@ const researcher = new Set<ResearchCapability>([
   ResearchCapability.runCancel,
   ResearchCapability.analysisWrite,
   ResearchCapability.claimFinalize,
+  ResearchCapability.trackReview,
+  ResearchCapability.evidenceIntegrate,
   ResearchCapability.exportCreate,
 ])
 const reviewer = new Set<ResearchCapability>([
   ResearchCapability.protocolApprove,
   ResearchCapability.analysisWrite,
   ResearchCapability.claimFinalize,
+  ResearchCapability.trackReview,
+  ResearchCapability.evidenceIntegrate,
   ResearchCapability.exportCreate,
 ])
 const viewer = new Set<ResearchCapability>()
@@ -51,6 +57,8 @@ const humanOnly = new Set<ResearchCapability>([
   ResearchCapability.protocolApprove,
   ResearchCapability.environmentManage,
   ResearchCapability.claimFinalize,
+  ResearchCapability.trackReview,
+  ResearchCapability.evidenceIntegrate,
   ResearchCapability.foundationPromote,
   ResearchCapability.overrideGate,
   ResearchCapability.transcriptDecrypt,

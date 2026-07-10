@@ -7,6 +7,7 @@ import path from "node:path"
 import { ResearchProjectService } from "../application/project"
 import { InvestigationService } from "../application/investigation"
 import { ResearchEvidenceService } from "../application/evidence"
+import { ResearchReviewService } from "../application/review"
 import { Ed25519 } from "../domain/signature"
 
 const execute = promisify(execFile)
@@ -89,6 +90,44 @@ describe("Research evidence", () => {
       signer,
     })
     expect(analysis.analysis).toMatchObject({ state: "finalized", artifactIds: [registered.artifact.id] })
+
+    const claim = await ResearchReviewService.createClaim({
+      projectRoot: root,
+      iterationId: current.iteration.id,
+      statement: "The registered artifact matched its signed manifest at analysis time.",
+      scope: "Integrity of this artifact only; not scientific validity of the underlying experiment.",
+      uncertainties: ["The source data and analysis choices require separate scientific review."],
+      analysisIds: [analysis.analysis.id],
+      artifactIds: [registered.artifact.id],
+      finalize: true,
+      actor,
+      role: "researcher",
+      signer,
+    })
+    const review = await ResearchReviewService.reviewTrack({
+      projectRoot: root,
+      trackId: current.iteration.trackId,
+      claimIds: [claim.claim.id],
+      analysisIds: [analysis.analysis.id],
+      outcome: "inconclusive",
+      rationale: "Retain the integrity result as negative/inconclusive evidence without promoting code.",
+      actor,
+      role: "reviewer",
+      signer,
+    })
+    const integration = await ResearchReviewService.integrateEvidenceOnly({
+      projectRoot: root,
+      reviewId: review.review.id,
+      actor,
+      role: "reviewer",
+      signer,
+    })
+    expect(integration.integration).toMatchObject({
+      mode: "evidence_only",
+      reviewId: review.review.id,
+      claimIds: [claim.claim.id],
+      artifactIds: [registered.artifact.id],
+    })
 
     await writeFile(result, "metric,value\naccuracy,0.99\n")
     expect(await ResearchEvidenceService.verifyArtifacts(root)).toMatchObject([
