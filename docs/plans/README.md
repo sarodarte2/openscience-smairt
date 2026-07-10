@@ -10,20 +10,27 @@ Nothing irreversible ships without owner sign-off — **sandboxing (10) is desig
 
 ## Workstreams
 
-| #   | Workstream                     | Plan                                                       | Kind                    | Status |
-| --- | ------------------------------ | ---------------------------------------------------------- | ----------------------- | ------ |
-| 1   | CI + test suite hardening      | [01-ci-tests.md](01-ci-tests.md)                           | fix + investigate       | 📝     |
-| 2   | Codex OAuth login              | [02-codex-oauth.md](02-codex-oauth.md)                     | fix                     | 📝     |
-| 3   | Atlas account sync             | [03-atlas-sync.md](03-atlas-sync.md)                       | fix                     | 📝     |
-| 4   | Onboarding → setup (browser)   | [04-onboarding-setup.md](04-onboarding-setup.md)           | feature                 | 📝     |
-| 5   | UX polish                      | [05-ux-polish.md](05-ux-polish.md)                         | feature                 | 📝     |
-| 6   | Compute integrations audit     | [06-compute-integrations.md](06-compute-integrations.md)   | investigate + fix       | 📝     |
-| 7   | Atlas experience               | [07-atlas-experience.md](07-atlas-experience.md)           | feature                 | 📝     |
-| 8   | Wallet + usage in settings     | [08-wallet-usage-settings.md](08-wallet-usage-settings.md) | feature                 | 📝     |
-| 9   | arXiv fetching                 | [09-arxiv-retrieval.md](09-arxiv-retrieval.md)             | fix                     | 📝     |
-| 10  | Agent sandboxing (design only) | [10-agent-sandboxing.md](10-agent-sandboxing.md)           | design — needs sign-off | 📝     |
-| 11  | Reviewer agent + open ideas    | [11-reviewer-agent.md](11-reviewer-agent.md)               | prototype/spec          | 📝     |
+| #   | Workstream                     | Plan                                                       | Kind                          | Status |
+| --- | ------------------------------ | ---------------------------------------------------------- | ----------------------------- | ------ |
+| 1   | CI + test suite hardening      | [01-ci-tests.md](01-ci-tests.md)                           | fix + investigate             | 📝     |
+| 2   | Codex OAuth login              | [02-codex-oauth.md](02-codex-oauth.md)                     | fix                           | 📝     |
+| 3   | Atlas account sync             | [03-atlas-sync.md](03-atlas-sync.md)                       | fix                           | 📝     |
+| 4   | Onboarding → setup (browser)   | [04-onboarding-setup.md](04-onboarding-setup.md)           | feature                       | 📝     |
+| 5   | UX polish                      | [05-ux-polish.md](05-ux-polish.md)                         | feature                       | 📝     |
+| 6   | Compute integrations audit     | [06-compute-integrations.md](06-compute-integrations.md)   | investigate + fix             | 📝     |
+| 7   | Atlas experience               | [07-atlas-experience.md](07-atlas-experience.md)           | feature                       | 📝     |
+| 8   | Wallet + usage in settings     | [08-wallet-usage-settings.md](08-wallet-usage-settings.md) | feature                       | 📝     |
+| 9   | arXiv fetching                 | [09-arxiv-retrieval.md](09-arxiv-retrieval.md)             | fix                           | 📝     |
+| 10  | Agent sandboxing (design only) | [10-agent-sandboxing.md](10-agent-sandboxing.md)           | design — needs sign-off       | 📝     |
+| 11  | Reviewer agent + open ideas    | [11-reviewer-agent.md](11-reviewer-agent.md)               | prototype/spec                | 📝     |
 | 12  | SMAIRT integration roadmap     | [12-smairt-integration.md](12-smairt-integration.md)       | feature roadmap (multi-phase) | 📝     |
+
+## OpenScience Research implementation
+
+Workstream 12 is now being implemented from the normative
+[`docs/specs/research`](../specs/research/README.md) package. The original roadmap remains here as
+design provenance; the specifications, ADRs, and work-packet graph are authoritative when the two
+differ.
 
 Status: 🔎 exploring · 📝 plan drafted · 🚧 implementing · ✅ done · ⛔ blocked on owner decision.
 

@@ -37,6 +37,7 @@ import { ProjectCommand } from "./cli/cmd/project"
 import { WalletCommand } from "./cli/cmd/billing"
 import { KeysCommand, ConnectCommand, DisconnectCommand } from "./cli/cmd/auth"
 import { LocalCommand } from "./cli/cmd/local"
+import { ResearchCommand } from "./cli/cmd/research"
 import { InitCommand, DoctorCommand } from "./cli/onboard"
 import { OpenScience } from "./openscience"
 
@@ -139,6 +140,7 @@ const cli = yargs(hideBin(process.argv))
   .command(WalletCommand)
   .command(DoctorCommand)
   .command(ProjectCommand)
+  .command(ResearchCommand)
   .command(ConnectCommand)
   .command(DisconnectCommand)
   .fail((msg, err) => {

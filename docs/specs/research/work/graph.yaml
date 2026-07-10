@@ -1,0 +1,144 @@
+version: 1
+packets:
+  WP-00-SPECS:
+    status: complete
+    spec: README
+    depends_on: []
+    owns:
+      - docs/specs/research/**
+    outputs:
+      - normative-specifications
+      - accepted-adrs
+      - requirement-graph
+
+  WP-01-DOMAIN:
+    status: partial
+    spec: "02"
+    depends_on: [WP-00-SPECS]
+    owns:
+      - backend/cli/src/research/domain/**
+      - backend/cli/src/research/__tests__/**
+    outputs:
+      - schemas
+      - transitions
+      - canonical-serialization
+
+  WP-02-LEDGER:
+    status: partial
+    spec: "03"
+    depends_on: [WP-01-DOMAIN]
+    owns:
+      - backend/cli/src/research/adapters/ledger/**
+      - backend/cli/src/research/__tests__/ledger.test.ts
+    outputs:
+      - project-ledger
+      - corruption-diagnostics
+
+  WP-03-SCAFFOLD:
+    status: partial
+    spec: "04"
+    depends_on: [WP-01-DOMAIN, WP-02-LEDGER]
+    owns:
+      - backend/cli/src/research/application/project.ts
+      - backend/cli/src/research/adapters/environment/**
+      - backend/cli/src/research/adapters/identity/**
+      - backend/cli/src/research/__tests__/project.test.ts
+    outputs:
+      - project-scaffold
+      - core-track
+      - environment-contract
+
+  WP-04-TRACKS:
+    status: partial
+    spec: "02"
+    depends_on: [WP-02-LEDGER, WP-03-SCAFFOLD]
+    owns:
+      - backend/cli/src/research/application/track.ts
+      - backend/cli/src/research/adapters/git/**
+      - backend/cli/src/research/application/investigation.ts
+      - backend/cli/src/research/__tests__/project.test.ts
+    outputs:
+      - track-lifecycle
+      - worktree-bindings
+      - foundation-lineage
+
+  WP-05-RUNNER:
+    status: partial
+    spec: "05"
+    depends_on: [WP-03-SCAFFOLD, WP-04-TRACKS]
+    owns:
+      - backend/cli/src/research/application/run.ts
+      - backend/cli/src/research/adapters/process/**
+      - backend/cli/src/research/adapters/process/**
+      - backend/cli/src/research/__tests__/runner.test.ts
+    outputs:
+      - python-runner
+      - run-envelope
+
+  WP-06-NOTEBOOK:
+    status: pending
+    spec: "05"
+    depends_on: [WP-05-RUNNER]
+    owns:
+      - backend/cli/src/research/adapters/notebook/**
+      - backend/cli/test/research/notebook/**
+    outputs:
+      - clean-notebook-runner
+
+  WP-07-API:
+    status: partial
+    spec: "07"
+    depends_on: [WP-04-TRACKS, WP-05-RUNNER]
+    owns:
+      - backend/cli/src/server/routes/research.ts
+      - backend/cli/src/cli/cmd/research.ts
+      - backend/cli/src/tool/research.ts
+      - backend/cli/src/research/__tests__/**
+    outputs:
+      - openapi-contract
+      - cli-tool-parity
+
+  WP-08-UI:
+    status: partial
+    spec: "01"
+    depends_on: [WP-07-API]
+    owns:
+      - frontend/workspace/src/thesis/ResearchPanel.tsx
+      - frontend/workspace/e2e/research*.spec.ts
+    outputs:
+      - integrated-research-workspace
+
+  WP-09-INTEGRATE:
+    status: pending
+    spec: "09"
+    depends_on: [WP-04-TRACKS, WP-05-RUNNER, WP-07-API]
+    owns:
+      - backend/cli/src/research/application/integrate.ts
+      - backend/cli/test/research/integrate/**
+    outputs:
+      - evidence-bundles
+      - foundation-promotion
+
+  WP-10-TRUST:
+    status: pending
+    spec: "09"
+    depends_on: [WP-05-RUNNER, WP-09-INTEGRATE]
+    owns:
+      - backend/cli/src/research/application/audit.ts
+      - backend/cli/src/research/application/export.ts
+      - backend/cli/src/research/application/adopt.ts
+      - backend/cli/test/research/trust/**
+    outputs:
+      - audit
+      - export
+      - adoption
+
+  WP-11-RELEASE:
+    status: pending
+    spec: "10"
+    depends_on: [WP-06-NOTEBOOK, WP-08-UI, WP-10-TRUST]
+    owns:
+      - docs/specs/research/README.md
+      - frontend/workspace/e2e/research-release.spec.ts
+    outputs:
+      - public-v1-evidence

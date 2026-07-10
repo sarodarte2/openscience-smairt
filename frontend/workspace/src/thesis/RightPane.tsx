@@ -26,10 +26,12 @@ import { OpenScienceFileTree } from "@/thesis/OpenScienceFileTree"
 import { FilePreview } from "@/thesis/FilePreview"
 import { SkillLibraryDialog } from "@/thesis/SkillsBrowser"
 import { ThesisCanvas } from "@/thesis/ThesisCanvas"
+import { ResearchPanel } from "@/thesis/ResearchPanel"
 import { thesisAPI, type ThesisNode } from "@/thesis/api/thesis"
 import { toast } from "@/thesis/Toast"
 import {
   IconLayoutGrid,
+  IconBookOpen,
   IconCpu,
   IconBraces,
   IconFolderTree,
@@ -85,6 +87,7 @@ export function RightPane(): JSX.Element {
     dialog.show(() => <SkillLibraryDialog onPick={(name) => uiStore.setPrefill(`/${name} `)} />)
   const TABS: { k: RightPaneTab; label?: string; Icon: (p: { size?: number; strokeWidth?: number }) => JSX.Element }[] =
     [
+      { k: "research", label: "research", Icon: IconBookOpen },
       { k: "canvas", label: "atlas", Icon: IconLayoutGrid },
       { k: "terminal", Icon: IconTerminal },
     ]
@@ -256,6 +259,9 @@ export function RightPane(): JSX.Element {
           </div>
         </div>
         <div style={{ flex: 1, "min-height": 0, position: "relative", display: "flex", "flex-direction": "column" }}>
+          <KeepAlive show={tab() === "research"} mounted={visited().has("research")}>
+            <ResearchPanel />
+          </KeepAlive>
           <KeepAlive show={tab() === "canvas"} mounted={visited().has("canvas")}>
             <CanvasTab />
           </KeepAlive>

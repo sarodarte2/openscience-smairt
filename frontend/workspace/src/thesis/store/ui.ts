@@ -1,6 +1,6 @@
 import { createSignal } from "solid-js"
 
-export type RightPaneTab = "canvas" | "terminal"
+export type RightPaneTab = "research" | "canvas" | "terminal"
 
 const PANE_OPEN_KEY = "thesis-rightpane-open-v1"
 const HIDDEN_TABS_KEY = "thesis-rightpane-hidden-tabs-v1"
@@ -39,7 +39,7 @@ function readHiddenTabs(): RightPaneTab[] {
 
 const [helpOpen, setHelpOpen] = createSignal(false)
 const [paletteOpen, setPaletteOpen] = createSignal(false)
-const [rightPaneTab, setRightPaneTab] = createSignal<RightPaneTab>("canvas")
+const [rightPaneTab, setRightPaneTab] = createSignal<RightPaneTab>("research")
 const [rightPaneOpen, setRightPaneOpenRaw] = createSignal(readPaneOpen())
 const [hiddenTabs, setHiddenTabs] = createSignal<RightPaneTab[]>(readHiddenTabs())
 const [agent, setAgentRaw] = createSignal<string>(readAgent())
