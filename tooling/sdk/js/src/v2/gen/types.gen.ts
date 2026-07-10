@@ -673,6 +673,75 @@ export type EventTodoUpdated = {
   }
 }
 
+export type EventResearchOperationUpdated = {
+  type: "research.operation.updated"
+  properties: {
+    version: 1
+    operationId: string
+    projectId: string
+    state: "started" | "succeeded" | "failed"
+    kind: string
+    message?: string
+  }
+}
+
+export type EventResearchTrackUpdated = {
+  type: "research.track.updated"
+  properties: {
+    version: 1
+    projectId: string
+    trackId: string
+    eventId: string
+    action: "created" | "updated" | "state_changed" | "workspace_bound" | "environment_diverged"
+    replayed: boolean
+  }
+}
+
+export type EventResearchIterationUpdated = {
+  type: "research.iteration.updated"
+  properties: {
+    version: 1
+    projectId: string
+    iterationId: string
+    eventId: string
+    action: "created" | "protocol_frozen" | "state_changed"
+    replayed: boolean
+  }
+}
+
+export type EventResearchRunUpdated = {
+  type: "research.run.updated"
+  properties: {
+    version: 1
+    projectId: string
+    runId: string
+    eventId: string
+    state: "declared" | "queued" | "running" | "succeeded" | "failed" | "timed_out" | "cancelled" | "lost"
+    replayed: boolean
+  }
+}
+
+export type EventResearchApprovalRequested = {
+  type: "research.approval.requested"
+  properties: {
+    version: 1
+    projectId: string
+    subjectType: "protocol" | "run" | "integration" | "foundation" | "export"
+    subjectId: string
+    reason: string
+  }
+}
+
+export type EventResearchAuditUpdated = {
+  type: "research.audit.updated"
+  properties: {
+    version: 1
+    projectId: string
+    readOnly: boolean
+    diagnosticCount: number
+  }
+}
+
 export type EventMcpToolsChanged = {
   type: "mcp.tools.changed"
   properties: {
@@ -863,6 +932,12 @@ export type Event =
   | EventQuestionRejected
   | EventSessionCompacted
   | EventTodoUpdated
+  | EventResearchOperationUpdated
+  | EventResearchTrackUpdated
+  | EventResearchIterationUpdated
+  | EventResearchRunUpdated
+  | EventResearchApprovalRequested
+  | EventResearchAuditUpdated
   | EventMcpToolsChanged
   | EventMcpBrowserOpenFailed
   | EventCommandExecuted
@@ -1758,6 +1833,10 @@ export type Config = {
      * Timeout in milliseconds for model context protocol (MCP) requests
      */
     mcp_timeout?: number
+    /**
+     * Run a blind reviewer on a primary agent's final answer and append its verdict as a footer note ('annotate' = on, non-blocking). Off by default.
+     */
+    reviewGate?: "off" | "annotate"
   }
 }
 
@@ -2431,6 +2510,27 @@ export type AccountBillingModeSetResponses = {
 
 export type AccountBillingModeSetResponse = AccountBillingModeSetResponses[keyof AccountBillingModeSetResponses]
 
+export type AccountLoginKeyData = {
+  body?: {
+    key: string
+  }
+  path?: never
+  query?: never
+  url: "/account/login-key"
+}
+
+export type AccountLoginKeyResponses = {
+  /**
+   * Login result
+   */
+  200: {
+    ok: boolean
+    error?: string
+  }
+}
+
+export type AccountLoginKeyResponse = AccountLoginKeyResponses[keyof AccountLoginKeyResponses]
+
 export type AccountLogoutData = {
   body?: never
   path?: never
@@ -3089,6 +3189,51 @@ export type SettingsPreferencesUpdateResponses = {
 export type SettingsPreferencesUpdateResponse =
   SettingsPreferencesUpdateResponses[keyof SettingsPreferencesUpdateResponses]
 
+export type PostSettingsLocalStartData = {
+  body?: {
+    id: string
+  }
+  path?: never
+  query?: never
+  url: "/settings/local/start"
+}
+
+export type PostSettingsLocalStartResponses = {
+  200: unknown
+}
+
+export type PostSettingsLocalModelsData = {
+  body?: {
+    url: string
+    key?: string
+  }
+  path?: never
+  query?: never
+  url: "/settings/local/models"
+}
+
+export type PostSettingsLocalModelsResponses = {
+  200: unknown
+}
+
+export type PostSettingsLocalData = {
+  body?: {
+    url: string
+    id?: string
+    name?: string
+    key?: string
+    models: Array<string>
+    setDefault?: boolean
+  }
+  path?: never
+  query?: never
+  url: "/settings/local"
+}
+
+export type PostSettingsLocalResponses = {
+  200: unknown
+}
+
 export type SettingsBillingGetData = {
   body?: never
   path?: never
@@ -3149,6 +3294,38 @@ export type SettingsBillingUpdateResponses = {
 }
 
 export type SettingsBillingUpdateResponse = SettingsBillingUpdateResponses[keyof SettingsBillingUpdateResponses]
+
+export type SettingsWalletGetData = {
+  body?: never
+  path?: never
+  query?: never
+  url: "/settings/wallet"
+}
+
+export type SettingsWalletGetResponses = {
+  /**
+   * Wallet state
+   */
+  200: {
+    signedIn: boolean
+    /**
+     * Wallet balance in USD; -1 when signed out or unavailable
+     */
+    balanceUsd: number
+    billingMode: "managed" | "byok" | null
+    managedSupported: boolean
+    lifetimeSpentUsd: number
+    transactions: Array<{
+      id: string
+      amountCents: number
+      source: string
+      description: string
+      createdAt: string
+    }>
+  }
+}
+
+export type SettingsWalletGetResponse = SettingsWalletGetResponses[keyof SettingsWalletGetResponses]
 
 export type AuthRemoveData = {
   body?: never
@@ -5627,6 +5804,1257 @@ export type SettingsUsageGetResponses = {
 }
 
 export type SettingsUsageGetResponse = SettingsUsageGetResponses[keyof SettingsUsageGetResponses]
+
+export type ResearchStatusData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+  }
+  url: "/research"
+}
+
+export type ResearchStatusResponses = {
+  /**
+   * Research project status
+   */
+  200:
+    | {
+        initialized: false
+        root: string
+      }
+    | {
+        initialized: true
+        root: string
+        project: {
+          schemaVersion: 1
+          projectId: string
+          createdAt: string
+          createdBy: {
+            kind: "human" | "agent" | "system"
+            id: string
+            displayName: string
+            delegationId?: string
+          }
+          id: string
+          name: string
+          description?: string
+          defaultEnvironment: {
+            kind: "conda"
+            name: string
+          }
+          coreTrackId: string
+          activeFoundationId: string | null
+        }
+        eventCount: number
+        readOnly: boolean
+        diagnostics: Array<{
+          code: string
+          file: string
+          message: string
+        }>
+      }
+}
+
+export type ResearchStatusResponse = ResearchStatusResponses[keyof ResearchStatusResponses]
+
+export type ResearchLedgerData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+  }
+  url: "/research/ledger"
+}
+
+export type ResearchLedgerResponses = {
+  /**
+   * Verified research events and diagnostics
+   */
+  200: {
+    events: Array<{
+      schemaVersion: 1
+      eventId: string
+      projectId: string
+      type: string
+      parents: Array<{
+        eventId: string
+        hash: string
+      }>
+      actor: {
+        kind: "human" | "agent" | "system"
+        id: string
+        displayName: string
+        delegationId?: string
+      }
+      occurredAt: string
+      payloadHash: string
+      idempotency?: {
+        keyHash: string
+        requestHash: string
+      }
+      contentHash: string
+      signature: {
+        algorithm: "ed25519"
+        keyId: string
+        publicKey: string
+        value: string
+      }
+      eventHash: string
+      payload: unknown
+    }>
+    diagnostics: Array<{
+      code: string
+      file: string
+      message: string
+    }>
+    readOnly: boolean
+  }
+}
+
+export type ResearchLedgerResponse = ResearchLedgerResponses[keyof ResearchLedgerResponses]
+
+export type ResearchInitializeData = {
+  body?: {
+    name: string
+    description?: string
+    createCondaEnvironment?: boolean
+    passphrase?: string
+    humanConfirmed: true
+  }
+  path?: never
+  query?: {
+    directory?: string
+  }
+  url: "/research/initialize"
+}
+
+export type ResearchInitializeErrors = {
+  /**
+   * Signing identity needs a passphrase
+   */
+  422: unknown
+}
+
+export type ResearchInitializeResponses = {
+  /**
+   * Initialized research project
+   */
+  200:
+    | {
+        initialized: false
+        root: string
+      }
+    | {
+        initialized: true
+        root: string
+        project: {
+          schemaVersion: 1
+          projectId: string
+          createdAt: string
+          createdBy: {
+            kind: "human" | "agent" | "system"
+            id: string
+            displayName: string
+            delegationId?: string
+          }
+          id: string
+          name: string
+          description?: string
+          defaultEnvironment: {
+            kind: "conda"
+            name: string
+          }
+          coreTrackId: string
+          activeFoundationId: string | null
+        }
+        eventCount: number
+        readOnly: boolean
+        diagnostics: Array<{
+          code: string
+          file: string
+          message: string
+        }>
+      }
+}
+
+export type ResearchInitializeResponse = ResearchInitializeResponses[keyof ResearchInitializeResponses]
+
+export type ResearchTrackListData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+  }
+  url: "/research/tracks"
+}
+
+export type ResearchTrackListResponses = {
+  /**
+   * Research tracks
+   */
+  200: Array<{
+    schemaVersion: 1
+    projectId: string
+    createdAt: string
+    createdBy: {
+      kind: "human" | "agent" | "system"
+      id: string
+      displayName: string
+      delegationId?: string
+    }
+    id: string
+    alias: string
+    title: string
+    objective: string
+    state:
+      | "draft"
+      | "active"
+      | "review_ready"
+      | "accepted"
+      | "not_selected"
+      | "inconclusive"
+      | "abandoned"
+      | "superseded"
+      | "synthesized"
+    hidden?: boolean
+    parentTrackIds: Array<string>
+    supersedesTrackId?: string
+  }>
+}
+
+export type ResearchTrackListResponse = ResearchTrackListResponses[keyof ResearchTrackListResponses]
+
+export type ResearchTrackCreateData = {
+  body?: {
+    title: string
+    objective: string
+    alias?: string
+    parentTrackIds?: Array<string>
+    workspace:
+      | {
+          kind: "none"
+        }
+      | {
+          kind: "current"
+        }
+      | {
+          kind: "new-worktree"
+          branch: string
+          worktreePath: string
+        }
+    passphrase?: string
+    humanConfirmed: true
+  }
+  headers: {
+    "idempotency-key": string
+  }
+  path?: never
+  query?: {
+    directory?: string
+  }
+  url: "/research/tracks"
+}
+
+export type ResearchTrackCreateErrors = {
+  /**
+   * Signing identity is not an active member or lacks permission
+   */
+  403: unknown
+  /**
+   * Idempotency conflict or read-only research record
+   */
+  409: unknown
+  /**
+   * Signing identity needs a passphrase
+   */
+  422: unknown
+}
+
+export type ResearchTrackCreateResponses = {
+  /**
+   * Created track
+   */
+  200: {
+    track: {
+      schemaVersion: 1
+      projectId: string
+      createdAt: string
+      createdBy: {
+        kind: "human" | "agent" | "system"
+        id: string
+        displayName: string
+        delegationId?: string
+      }
+      id: string
+      alias: string
+      title: string
+      objective: string
+      state:
+        | "draft"
+        | "active"
+        | "review_ready"
+        | "accepted"
+        | "not_selected"
+        | "inconclusive"
+        | "abandoned"
+        | "superseded"
+        | "synthesized"
+      hidden?: boolean
+      parentTrackIds: Array<string>
+      supersedesTrackId?: string
+    }
+    binding: {
+      schemaVersion: 1
+      projectId: string
+      createdAt: string
+      createdBy: {
+        kind: "human" | "agent" | "system"
+        id: string
+        displayName: string
+        delegationId?: string
+      }
+      id: string
+      trackId: string
+      repositoryRoot: string
+      worktreePath: string
+      branch: string
+      boundAtCommit: string | null
+      active: boolean
+    } | null
+    environment: {
+      schemaVersion: 1
+      projectId: string
+      createdAt: string
+      createdBy: {
+        kind: "human" | "agent" | "system"
+        id: string
+        displayName: string
+        delegationId?: string
+      }
+      trackId: string
+      kind: "conda"
+      name: string
+      portableSpecPath: string
+      portableSpecHash: string
+      state: "base" | "inherited" | "diverged"
+      inheritedFromTrackId: string | null
+    } | null
+    eventId: string
+    replayed: boolean
+  }
+}
+
+export type ResearchTrackCreateResponse = ResearchTrackCreateResponses[keyof ResearchTrackCreateResponses]
+
+export type ResearchIterationListData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+    trackId?: string
+  }
+  url: "/research/iterations"
+}
+
+export type ResearchIterationListResponses = {
+  /**
+   * Research iterations
+   */
+  200: Array<{
+    schemaVersion: 1
+    projectId: string
+    createdAt: string
+    createdBy: {
+      kind: "human" | "agent" | "system"
+      id: string
+      displayName: string
+      delegationId?: string
+    }
+    id: string
+    trackId: string
+    alias: string
+    title: string
+    mode: "exploratory" | "confirmatory" | "replication" | "benchmark"
+    question: string
+    decisionGoal: string
+    state: "draft" | "protocol_ready" | "approved" | "running" | "analysis" | "complete" | "cancelled"
+  }>
+}
+
+export type ResearchIterationListResponse = ResearchIterationListResponses[keyof ResearchIterationListResponses]
+
+export type ResearchIterationCreateData = {
+  body?: {
+    trackId: string
+    title: string
+    question: string
+    decisionGoal: string
+    alias?: string
+    content:
+      | {
+          mode: "exploratory"
+          aim: string
+          intendedInputs: Array<string>
+          intendedOutputs: Array<string>
+          decisionGoal: string
+        }
+      | {
+          mode: "confirmatory"
+          hypothesis: string
+          nullHypothesis: string
+          primaryOutcome: string
+          controls: Array<string>
+          exclusions: Array<string>
+          statisticalMethod: string
+          stoppingRule: string
+          decisionRule: string
+        }
+      | {
+          mode: "replication"
+          sourceProtocol: string
+          faithfulElements: Array<string>
+          deviations: Array<string>
+          equivalenceRule: string
+        }
+      | {
+          mode: "benchmark"
+          datasetsAndSplits: Array<string>
+          baselines: Array<string>
+          metrics: Array<string>
+          leakageBoundary: string
+        }
+    passphrase?: string
+    humanConfirmed: true
+  }
+  headers: {
+    "idempotency-key": string
+  }
+  path?: never
+  query?: {
+    directory?: string
+  }
+  url: "/research/iterations"
+}
+
+export type ResearchIterationCreateErrors = {
+  /**
+   * Signing identity is not an active member or lacks permission
+   */
+  403: unknown
+  /**
+   * Idempotency conflict or read-only research record
+   */
+  409: unknown
+  /**
+   * Signing identity needs a passphrase
+   */
+  422: unknown
+}
+
+export type ResearchIterationCreateResponses = {
+  /**
+   * Created iteration and draft protocol
+   */
+  200: {
+    iteration: {
+      schemaVersion: 1
+      projectId: string
+      createdAt: string
+      createdBy: {
+        kind: "human" | "agent" | "system"
+        id: string
+        displayName: string
+        delegationId?: string
+      }
+      id: string
+      trackId: string
+      alias: string
+      title: string
+      mode: "exploratory" | "confirmatory" | "replication" | "benchmark"
+      question: string
+      decisionGoal: string
+      state: "draft" | "protocol_ready" | "approved" | "running" | "analysis" | "complete" | "cancelled"
+    }
+    protocol: {
+      schemaVersion: 1
+      projectId: string
+      createdAt: string
+      createdBy: {
+        kind: "human" | "agent" | "system"
+        id: string
+        displayName: string
+        delegationId?: string
+      }
+      id: string
+      iterationId: string
+      revision: number
+      mode: "exploratory" | "confirmatory" | "replication" | "benchmark"
+      content:
+        | {
+            mode: "exploratory"
+            aim: string
+            intendedInputs: Array<string>
+            intendedOutputs: Array<string>
+            decisionGoal: string
+          }
+        | {
+            mode: "confirmatory"
+            hypothesis: string
+            nullHypothesis: string
+            primaryOutcome: string
+            controls: Array<string>
+            exclusions: Array<string>
+            statisticalMethod: string
+            stoppingRule: string
+            decisionRule: string
+          }
+        | {
+            mode: "replication"
+            sourceProtocol: string
+            faithfulElements: Array<string>
+            deviations: Array<string>
+            equivalenceRule: string
+          }
+        | {
+            mode: "benchmark"
+            datasetsAndSplits: Array<string>
+            baselines: Array<string>
+            metrics: Array<string>
+            leakageBoundary: string
+          }
+      frozenAt: string | null
+      resultsViewedBeforeAmendment: boolean
+      supersedesProtocolId?: string
+    }
+    eventId: string
+    replayed: boolean
+  }
+}
+
+export type ResearchIterationCreateResponse = ResearchIterationCreateResponses[keyof ResearchIterationCreateResponses]
+
+export type ResearchProtocolListData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+    iterationId?: string
+  }
+  url: "/research/protocols"
+}
+
+export type ResearchProtocolListResponses = {
+  /**
+   * Protocol revisions
+   */
+  200: Array<{
+    schemaVersion: 1
+    projectId: string
+    createdAt: string
+    createdBy: {
+      kind: "human" | "agent" | "system"
+      id: string
+      displayName: string
+      delegationId?: string
+    }
+    id: string
+    iterationId: string
+    revision: number
+    mode: "exploratory" | "confirmatory" | "replication" | "benchmark"
+    content:
+      | {
+          mode: "exploratory"
+          aim: string
+          intendedInputs: Array<string>
+          intendedOutputs: Array<string>
+          decisionGoal: string
+        }
+      | {
+          mode: "confirmatory"
+          hypothesis: string
+          nullHypothesis: string
+          primaryOutcome: string
+          controls: Array<string>
+          exclusions: Array<string>
+          statisticalMethod: string
+          stoppingRule: string
+          decisionRule: string
+        }
+      | {
+          mode: "replication"
+          sourceProtocol: string
+          faithfulElements: Array<string>
+          deviations: Array<string>
+          equivalenceRule: string
+        }
+      | {
+          mode: "benchmark"
+          datasetsAndSplits: Array<string>
+          baselines: Array<string>
+          metrics: Array<string>
+          leakageBoundary: string
+        }
+    frozenAt: string | null
+    resultsViewedBeforeAmendment: boolean
+    supersedesProtocolId?: string
+  }>
+}
+
+export type ResearchProtocolListResponse = ResearchProtocolListResponses[keyof ResearchProtocolListResponses]
+
+export type ResearchProtocolFreezeData = {
+  body?: {
+    passphrase?: string
+    humanConfirmed: true
+  }
+  headers: {
+    "idempotency-key": string
+  }
+  path: {
+    protocolId: string
+  }
+  query?: {
+    directory?: string
+  }
+  url: "/research/protocols/{protocolId}/freeze"
+}
+
+export type ResearchProtocolFreezeErrors = {
+  /**
+   * Signing identity is not an active member or lacks permission
+   */
+  403: unknown
+  /**
+   * Idempotency conflict or read-only research record
+   */
+  409: unknown
+  /**
+   * Signing identity needs a passphrase
+   */
+  422: unknown
+}
+
+export type ResearchProtocolFreezeResponses = {
+  /**
+   * Frozen protocol and updated iteration
+   */
+  200: {
+    protocol: {
+      schemaVersion: 1
+      projectId: string
+      createdAt: string
+      createdBy: {
+        kind: "human" | "agent" | "system"
+        id: string
+        displayName: string
+        delegationId?: string
+      }
+      id: string
+      iterationId: string
+      revision: number
+      mode: "exploratory" | "confirmatory" | "replication" | "benchmark"
+      content:
+        | {
+            mode: "exploratory"
+            aim: string
+            intendedInputs: Array<string>
+            intendedOutputs: Array<string>
+            decisionGoal: string
+          }
+        | {
+            mode: "confirmatory"
+            hypothesis: string
+            nullHypothesis: string
+            primaryOutcome: string
+            controls: Array<string>
+            exclusions: Array<string>
+            statisticalMethod: string
+            stoppingRule: string
+            decisionRule: string
+          }
+        | {
+            mode: "replication"
+            sourceProtocol: string
+            faithfulElements: Array<string>
+            deviations: Array<string>
+            equivalenceRule: string
+          }
+        | {
+            mode: "benchmark"
+            datasetsAndSplits: Array<string>
+            baselines: Array<string>
+            metrics: Array<string>
+            leakageBoundary: string
+          }
+      frozenAt: string | null
+      resultsViewedBeforeAmendment: boolean
+      supersedesProtocolId?: string
+    }
+    iteration: {
+      schemaVersion: 1
+      projectId: string
+      createdAt: string
+      createdBy: {
+        kind: "human" | "agent" | "system"
+        id: string
+        displayName: string
+        delegationId?: string
+      }
+      id: string
+      trackId: string
+      alias: string
+      title: string
+      mode: "exploratory" | "confirmatory" | "replication" | "benchmark"
+      question: string
+      decisionGoal: string
+      state: "draft" | "protocol_ready" | "approved" | "running" | "analysis" | "complete" | "cancelled"
+    }
+    eventId: string
+    replayed: boolean
+  }
+}
+
+export type ResearchProtocolFreezeResponse = ResearchProtocolFreezeResponses[keyof ResearchProtocolFreezeResponses]
+
+export type ResearchEnvironmentListData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+  }
+  url: "/research/environments"
+}
+
+export type ResearchEnvironmentListResponses = {
+  /**
+   * Track environment bindings
+   */
+  200: Array<{
+    schemaVersion: 1
+    projectId: string
+    createdAt: string
+    createdBy: {
+      kind: "human" | "agent" | "system"
+      id: string
+      displayName: string
+      delegationId?: string
+    }
+    trackId: string
+    kind: "conda"
+    name: string
+    portableSpecPath: string
+    portableSpecHash: string
+    state: "base" | "inherited" | "diverged"
+    inheritedFromTrackId: string | null
+  }>
+}
+
+export type ResearchEnvironmentListResponse = ResearchEnvironmentListResponses[keyof ResearchEnvironmentListResponses]
+
+export type ResearchEnvironmentIsolateData = {
+  body?: {
+    passphrase?: string
+    humanConfirmed: true
+  }
+  headers: {
+    "idempotency-key": string
+  }
+  path: {
+    trackId: string
+  }
+  query?: {
+    directory?: string
+  }
+  url: "/research/environments/{trackId}/isolate"
+}
+
+export type ResearchEnvironmentIsolateErrors = {
+  /**
+   * Only an authorized human project member may isolate an environment
+   */
+  403: unknown
+  /**
+   * Idempotency conflict, existing divergence, or read-only research record
+   */
+  409: unknown
+  /**
+   * Signing identity needs a passphrase
+   */
+  422: unknown
+}
+
+export type ResearchEnvironmentIsolateResponses = {
+  /**
+   * Divergent track environment and explicit provisioning command
+   */
+  200: {
+    environment: {
+      schemaVersion: 1
+      projectId: string
+      createdAt: string
+      createdBy: {
+        kind: "human" | "agent" | "system"
+        id: string
+        displayName: string
+        delegationId?: string
+      }
+      trackId: string
+      kind: "conda"
+      name: string
+      portableSpecPath: string
+      portableSpecHash: string
+      state: "base" | "inherited" | "diverged"
+      inheritedFromTrackId: string | null
+    }
+    eventId: string
+    replayed: boolean
+    provision: {
+      command: "conda"
+      args: Array<string>
+    }
+  }
+}
+
+export type ResearchEnvironmentIsolateResponse =
+  ResearchEnvironmentIsolateResponses[keyof ResearchEnvironmentIsolateResponses]
+
+export type ResearchRunListData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+    iterationId?: string
+  }
+  url: "/research/runs"
+}
+
+export type ResearchRunListResponses = {
+  /**
+   * Formal run attempts
+   */
+  200: Array<{
+    schemaVersion: 1
+    projectId: string
+    createdAt: string
+    createdBy: {
+      kind: "human" | "agent" | "system"
+      id: string
+      displayName: string
+      delegationId?: string
+    }
+    id: string
+    iterationId: string
+    protocolId: string
+    intentEventId: string
+    workspaceStateHash: string
+    environmentHash: string
+    workspace: {
+      kind: "git"
+      branch: string
+      commit: string | null
+      dirty: boolean
+      statusHash: string
+      trackedFilesHash: string
+      untrackedFilesHash: string
+      captureConfidence: "complete" | "best_effort"
+    }
+    environment: {
+      kind: "conda"
+      name: string
+      portableSpecPath: string
+      portableSpecHash: string
+      resolvedSpecPath: string
+      resolvedSpecHash: string
+      platform: string
+      captureConfidence: "complete" | "credential_redacted"
+    }
+    kind?: "command" | "notebook"
+    notebook?: {
+      sourcePath: string
+      sourceHash: string
+      originalPath: string
+      executedPath: string
+      executedHash: string | null
+      allowErrors: boolean
+    } | null
+    seed?: number
+    execution: {
+      command: string
+      args: Array<string>
+      cwd: string
+      timeoutMs: number
+      environmentKeys: Array<string>
+    }
+    state: "declared" | "queued" | "running" | "succeeded" | "failed" | "timed_out" | "cancelled" | "lost"
+    result?: {
+      outcome: "succeeded" | "failed" | "timed_out" | "cancelled" | "lost"
+      exitCode: number | null
+      signal: string | null
+      stdoutHash: string
+      stderrHash: string
+      stdoutPath: string
+      stderrPath: string
+      startedAt: string
+      finishedAt: string
+      durationMs: number
+      error?: string
+    }
+    parameters: unknown
+  }>
+}
+
+export type ResearchRunListResponse = ResearchRunListResponses[keyof ResearchRunListResponses]
+
+export type ResearchRunDeclareData = {
+  body?: {
+    protocolId: string
+    parameters?: unknown
+    seed?: number
+    execution: {
+      command: string
+      args?: Array<string>
+      cwd?: string
+      timeoutMs?: number
+      environmentKeys?: Array<string>
+    }
+    passphrase?: string
+    humanConfirmed: true
+  }
+  headers: {
+    "idempotency-key": string
+  }
+  path?: never
+  query?: {
+    directory?: string
+  }
+  url: "/research/runs"
+}
+
+export type ResearchRunDeclareErrors = {
+  /**
+   * Signing identity is not an active member or lacks permission
+   */
+  403: unknown
+  /**
+   * Idempotency conflict or read-only research record
+   */
+  409: unknown
+  /**
+   * Conda environment or signing identity needs attention
+   */
+  422: unknown
+}
+
+export type ResearchRunDeclareResponses = {
+  /**
+   * Declared formal run
+   */
+  200: {
+    run: {
+      schemaVersion: 1
+      projectId: string
+      createdAt: string
+      createdBy: {
+        kind: "human" | "agent" | "system"
+        id: string
+        displayName: string
+        delegationId?: string
+      }
+      id: string
+      iterationId: string
+      protocolId: string
+      intentEventId: string
+      workspaceStateHash: string
+      environmentHash: string
+      workspace: {
+        kind: "git"
+        branch: string
+        commit: string | null
+        dirty: boolean
+        statusHash: string
+        trackedFilesHash: string
+        untrackedFilesHash: string
+        captureConfidence: "complete" | "best_effort"
+      }
+      environment: {
+        kind: "conda"
+        name: string
+        portableSpecPath: string
+        portableSpecHash: string
+        resolvedSpecPath: string
+        resolvedSpecHash: string
+        platform: string
+        captureConfidence: "complete" | "credential_redacted"
+      }
+      kind?: "command" | "notebook"
+      notebook?: {
+        sourcePath: string
+        sourceHash: string
+        originalPath: string
+        executedPath: string
+        executedHash: string | null
+        allowErrors: boolean
+      } | null
+      seed?: number
+      execution: {
+        command: string
+        args: Array<string>
+        cwd: string
+        timeoutMs: number
+        environmentKeys: Array<string>
+      }
+      state: "declared" | "queued" | "running" | "succeeded" | "failed" | "timed_out" | "cancelled" | "lost"
+      result?: {
+        outcome: "succeeded" | "failed" | "timed_out" | "cancelled" | "lost"
+        exitCode: number | null
+        signal: string | null
+        stdoutHash: string
+        stderrHash: string
+        stdoutPath: string
+        stderrPath: string
+        startedAt: string
+        finishedAt: string
+        durationMs: number
+        error?: string
+      }
+      parameters: unknown
+    }
+    eventId: string
+    replayed: boolean
+  }
+}
+
+export type ResearchRunDeclareResponse = ResearchRunDeclareResponses[keyof ResearchRunDeclareResponses]
+
+export type ResearchRunNotebookDeclareData = {
+  body?: {
+    protocolId: string
+    notebookPath: string
+    parameters?: unknown
+    seed?: number
+    timeoutMs?: number
+    allowErrors?: boolean
+    environmentKeys?: Array<string>
+    passphrase?: string
+    humanConfirmed: true
+  }
+  headers: {
+    "idempotency-key": string
+  }
+  path?: never
+  query?: {
+    directory?: string
+  }
+  url: "/research/runs/notebooks"
+}
+
+export type ResearchRunNotebookDeclareErrors = {
+  /**
+   * Signing identity is not an active member or lacks permission
+   */
+  403: unknown
+  /**
+   * Idempotency conflict or read-only research record
+   */
+  409: unknown
+  /**
+   * Notebook, Conda environment, or signing identity needs attention
+   */
+  422: unknown
+}
+
+export type ResearchRunNotebookDeclareResponses = {
+  /**
+   * Declared formal notebook run
+   */
+  200: {
+    run: {
+      schemaVersion: 1
+      projectId: string
+      createdAt: string
+      createdBy: {
+        kind: "human" | "agent" | "system"
+        id: string
+        displayName: string
+        delegationId?: string
+      }
+      id: string
+      iterationId: string
+      protocolId: string
+      intentEventId: string
+      workspaceStateHash: string
+      environmentHash: string
+      workspace: {
+        kind: "git"
+        branch: string
+        commit: string | null
+        dirty: boolean
+        statusHash: string
+        trackedFilesHash: string
+        untrackedFilesHash: string
+        captureConfidence: "complete" | "best_effort"
+      }
+      environment: {
+        kind: "conda"
+        name: string
+        portableSpecPath: string
+        portableSpecHash: string
+        resolvedSpecPath: string
+        resolvedSpecHash: string
+        platform: string
+        captureConfidence: "complete" | "credential_redacted"
+      }
+      kind?: "command" | "notebook"
+      notebook?: {
+        sourcePath: string
+        sourceHash: string
+        originalPath: string
+        executedPath: string
+        executedHash: string | null
+        allowErrors: boolean
+      } | null
+      seed?: number
+      execution: {
+        command: string
+        args: Array<string>
+        cwd: string
+        timeoutMs: number
+        environmentKeys: Array<string>
+      }
+      state: "declared" | "queued" | "running" | "succeeded" | "failed" | "timed_out" | "cancelled" | "lost"
+      result?: {
+        outcome: "succeeded" | "failed" | "timed_out" | "cancelled" | "lost"
+        exitCode: number | null
+        signal: string | null
+        stdoutHash: string
+        stderrHash: string
+        stdoutPath: string
+        stderrPath: string
+        startedAt: string
+        finishedAt: string
+        durationMs: number
+        error?: string
+      }
+      parameters: unknown
+    }
+    eventId: string
+    replayed: boolean
+  }
+}
+
+export type ResearchRunNotebookDeclareResponse =
+  ResearchRunNotebookDeclareResponses[keyof ResearchRunNotebookDeclareResponses]
+
+export type ResearchRunExecuteData = {
+  body?: {
+    passphrase?: string
+    humanConfirmed: true
+  }
+  path: {
+    runId: string
+  }
+  query?: {
+    directory?: string
+  }
+  url: "/research/runs/{runId}/execute"
+}
+
+export type ResearchRunExecuteErrors = {
+  /**
+   * Signing identity is not an active member or lacks permission
+   */
+  403: unknown
+  /**
+   * Run is already active, unsafe to retry, or record is read-only
+   */
+  409: unknown
+  /**
+   * Signing identity needs a passphrase
+   */
+  422: unknown
+}
+
+export type ResearchRunExecuteResponses = {
+  /**
+   * Completed or previously completed formal run
+   */
+  200: {
+    run: {
+      schemaVersion: 1
+      projectId: string
+      createdAt: string
+      createdBy: {
+        kind: "human" | "agent" | "system"
+        id: string
+        displayName: string
+        delegationId?: string
+      }
+      id: string
+      iterationId: string
+      protocolId: string
+      intentEventId: string
+      workspaceStateHash: string
+      environmentHash: string
+      workspace: {
+        kind: "git"
+        branch: string
+        commit: string | null
+        dirty: boolean
+        statusHash: string
+        trackedFilesHash: string
+        untrackedFilesHash: string
+        captureConfidence: "complete" | "best_effort"
+      }
+      environment: {
+        kind: "conda"
+        name: string
+        portableSpecPath: string
+        portableSpecHash: string
+        resolvedSpecPath: string
+        resolvedSpecHash: string
+        platform: string
+        captureConfidence: "complete" | "credential_redacted"
+      }
+      kind?: "command" | "notebook"
+      notebook?: {
+        sourcePath: string
+        sourceHash: string
+        originalPath: string
+        executedPath: string
+        executedHash: string | null
+        allowErrors: boolean
+      } | null
+      seed?: number
+      execution: {
+        command: string
+        args: Array<string>
+        cwd: string
+        timeoutMs: number
+        environmentKeys: Array<string>
+      }
+      state: "declared" | "queued" | "running" | "succeeded" | "failed" | "timed_out" | "cancelled" | "lost"
+      result?: {
+        outcome: "succeeded" | "failed" | "timed_out" | "cancelled" | "lost"
+        exitCode: number | null
+        signal: string | null
+        stdoutHash: string
+        stderrHash: string
+        stdoutPath: string
+        stderrPath: string
+        startedAt: string
+        finishedAt: string
+        durationMs: number
+        error?: string
+      }
+      parameters: unknown
+    }
+    eventId: string
+    replayed: boolean
+  }
+}
+
+export type ResearchRunExecuteResponse = ResearchRunExecuteResponses[keyof ResearchRunExecuteResponses]
 
 export type InstanceDisposeData = {
   body?: never

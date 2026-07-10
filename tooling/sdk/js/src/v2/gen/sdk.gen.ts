@@ -9,6 +9,7 @@ import type {
   AccountDeviceRevokeResponses,
   AccountDevicesResponses,
   AccountGetResponses,
+  AccountLoginKeyResponses,
   AccountLogoutResponses,
   AgentPartInput,
   AppAgentsResponses,
@@ -85,6 +86,9 @@ import type {
   PermissionRespondErrors,
   PermissionRespondResponses,
   PermissionRuleset,
+  PostSettingsLocalModelsResponses,
+  PostSettingsLocalResponses,
+  PostSettingsLocalStartResponses,
   ProjectCurrentResponses,
   ProjectListResponses,
   ProjectUpdateErrors,
@@ -112,6 +116,29 @@ import type {
   QuestionRejectResponses,
   QuestionReplyErrors,
   QuestionReplyResponses,
+  ResearchEnvironmentIsolateErrors,
+  ResearchEnvironmentIsolateResponses,
+  ResearchEnvironmentListResponses,
+  ResearchInitializeErrors,
+  ResearchInitializeResponses,
+  ResearchIterationCreateErrors,
+  ResearchIterationCreateResponses,
+  ResearchIterationListResponses,
+  ResearchLedgerResponses,
+  ResearchProtocolFreezeErrors,
+  ResearchProtocolFreezeResponses,
+  ResearchProtocolListResponses,
+  ResearchRunDeclareErrors,
+  ResearchRunDeclareResponses,
+  ResearchRunExecuteErrors,
+  ResearchRunExecuteResponses,
+  ResearchRunListResponses,
+  ResearchRunNotebookDeclareErrors,
+  ResearchRunNotebookDeclareResponses,
+  ResearchStatusResponses,
+  ResearchTrackCreateErrors,
+  ResearchTrackCreateResponses,
+  ResearchTrackListResponses,
   SessionAbortErrors,
   SessionAbortResponses,
   SessionChildrenErrors,
@@ -183,6 +210,7 @@ import type {
   SettingsStorageResetLocationResponses,
   SettingsStorageUsageResponses,
   SettingsUsageGetResponses,
+  SettingsWalletGetResponses,
   SubtaskPartInput,
   TextPartInput,
   ToolIdsErrors,
@@ -481,6 +509,28 @@ export class Account extends HeyApiClient {
     return (options?.client ?? this.client).get<AccountDevicesResponses, unknown, ThrowOnError>({
       url: "/account/devices",
       ...options,
+    })
+  }
+
+  /**
+   * Sign in with an Atlas API key
+   */
+  public loginKey<ThrowOnError extends boolean = false>(
+    parameters?: {
+      key?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams([parameters], [{ args: [{ in: "body", key: "key" }] }])
+    return (options?.client ?? this.client).post<AccountLoginKeyResponses, unknown, ThrowOnError>({
+      url: "/account/login-key",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
     })
   }
 
@@ -995,6 +1045,18 @@ export class Billing extends HeyApiClient {
   }
 }
 
+export class Wallet extends HeyApiClient {
+  /**
+   * Get Atlas wallet balance, plan mode, and recent transactions
+   */
+  public get<ThrowOnError extends boolean = false>(options?: Options<never, ThrowOnError>) {
+    return (options?.client ?? this.client).get<SettingsWalletGetResponses, unknown, ThrowOnError>({
+      url: "/settings/wallet",
+      ...options,
+    })
+  }
+}
+
 export class Skills extends HeyApiClient {
   /**
    * Install skill from git
@@ -1225,6 +1287,11 @@ export class Settings extends HeyApiClient {
   private _billing?: Billing
   get billing(): Billing {
     return (this._billing ??= new Billing({ client: this.client }))
+  }
+
+  private _wallet?: Wallet
+  get wallet(): Wallet {
+    return (this._wallet ??= new Wallet({ client: this.client }))
   }
 
   private _skills?: Skills
@@ -3602,6 +3669,617 @@ export class Mcp extends HeyApiClient {
   }
 }
 
+export class Track extends HeyApiClient {
+  /**
+   * List stable scientific tracks
+   */
+  public list<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams([parameters], [{ args: [{ in: "query", key: "directory" }] }])
+    return (options?.client ?? this.client).get<ResearchTrackListResponses, unknown, ThrowOnError>({
+      url: "/research/tracks",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Create a scientific track and optionally bind a Git worktree
+   */
+  public create<ThrowOnError extends boolean = false>(
+    parameters: {
+      "idempotency-key": string
+      directory?: string
+      title?: string
+      objective?: string
+      alias?: string
+      parentTrackIds?: Array<string>
+      workspace?:
+        | {
+            kind: "none"
+          }
+        | {
+            kind: "current"
+          }
+        | {
+            kind: "new-worktree"
+            branch: string
+            worktreePath: string
+          }
+      passphrase?: string
+      humanConfirmed?: true
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "headers", key: "idempotency-key" },
+            { in: "query", key: "directory" },
+            { in: "body", key: "title" },
+            { in: "body", key: "objective" },
+            { in: "body", key: "alias" },
+            { in: "body", key: "parentTrackIds" },
+            { in: "body", key: "workspace" },
+            { in: "body", key: "passphrase" },
+            { in: "body", key: "humanConfirmed" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<ResearchTrackCreateResponses, ResearchTrackCreateErrors, ThrowOnError>(
+      {
+        url: "/research/tracks",
+        ...options,
+        ...params,
+        headers: {
+          "Content-Type": "application/json",
+          ...options?.headers,
+          ...params.headers,
+        },
+      },
+    )
+  }
+}
+
+export class Iteration extends HeyApiClient {
+  /**
+   * List scientific iterations
+   */
+  public list<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      trackId?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "trackId" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<ResearchIterationListResponses, unknown, ThrowOnError>({
+      url: "/research/iterations",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Create an iteration with a mode-specific draft protocol
+   */
+  public create<ThrowOnError extends boolean = false>(
+    parameters: {
+      "idempotency-key": string
+      directory?: string
+      trackId?: string
+      title?: string
+      question?: string
+      decisionGoal?: string
+      alias?: string
+      content?:
+        | {
+            mode: "exploratory"
+            aim: string
+            intendedInputs: Array<string>
+            intendedOutputs: Array<string>
+            decisionGoal: string
+          }
+        | {
+            mode: "confirmatory"
+            hypothesis: string
+            nullHypothesis: string
+            primaryOutcome: string
+            controls: Array<string>
+            exclusions: Array<string>
+            statisticalMethod: string
+            stoppingRule: string
+            decisionRule: string
+          }
+        | {
+            mode: "replication"
+            sourceProtocol: string
+            faithfulElements: Array<string>
+            deviations: Array<string>
+            equivalenceRule: string
+          }
+        | {
+            mode: "benchmark"
+            datasetsAndSplits: Array<string>
+            baselines: Array<string>
+            metrics: Array<string>
+            leakageBoundary: string
+          }
+      passphrase?: string
+      humanConfirmed?: true
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "headers", key: "idempotency-key" },
+            { in: "query", key: "directory" },
+            { in: "body", key: "trackId" },
+            { in: "body", key: "title" },
+            { in: "body", key: "question" },
+            { in: "body", key: "decisionGoal" },
+            { in: "body", key: "alias" },
+            { in: "body", key: "content" },
+            { in: "body", key: "passphrase" },
+            { in: "body", key: "humanConfirmed" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      ResearchIterationCreateResponses,
+      ResearchIterationCreateErrors,
+      ThrowOnError
+    >({
+      url: "/research/iterations",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+}
+
+export class Protocol extends HeyApiClient {
+  /**
+   * List protocol revisions
+   */
+  public list<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      iterationId?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "iterationId" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<ResearchProtocolListResponses, unknown, ThrowOnError>({
+      url: "/research/protocols",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Freeze a protocol revision after explicit human review
+   */
+  public freeze<ThrowOnError extends boolean = false>(
+    parameters: {
+      "idempotency-key": string
+      protocolId: string
+      directory?: string
+      passphrase?: string
+      humanConfirmed?: true
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "headers", key: "idempotency-key" },
+            { in: "path", key: "protocolId" },
+            { in: "query", key: "directory" },
+            { in: "body", key: "passphrase" },
+            { in: "body", key: "humanConfirmed" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      ResearchProtocolFreezeResponses,
+      ResearchProtocolFreezeErrors,
+      ThrowOnError
+    >({
+      url: "/research/protocols/{protocolId}/freeze",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+}
+
+export class Environment extends HeyApiClient {
+  /**
+   * List per-track Conda environment bindings
+   */
+  public list<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams([parameters], [{ args: [{ in: "query", key: "directory" }] }])
+    return (options?.client ?? this.client).get<ResearchEnvironmentListResponses, unknown, ThrowOnError>({
+      url: "/research/environments",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Create a track-specific Conda specification without mutating its parent environment
+   */
+  public isolate<ThrowOnError extends boolean = false>(
+    parameters: {
+      "idempotency-key": string
+      trackId: string
+      directory?: string
+      passphrase?: string
+      humanConfirmed?: true
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "headers", key: "idempotency-key" },
+            { in: "path", key: "trackId" },
+            { in: "query", key: "directory" },
+            { in: "body", key: "passphrase" },
+            { in: "body", key: "humanConfirmed" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      ResearchEnvironmentIsolateResponses,
+      ResearchEnvironmentIsolateErrors,
+      ThrowOnError
+    >({
+      url: "/research/environments/{trackId}/isolate",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+}
+
+export class Notebook extends HeyApiClient {
+  /**
+   * Capture provenance and declare a clean-kernel formal notebook run
+   */
+  public declare<ThrowOnError extends boolean = false>(
+    parameters: {
+      "idempotency-key": string
+      directory?: string
+      protocolId?: string
+      notebookPath?: string
+      parameters?: unknown
+      seed?: number
+      timeoutMs?: number
+      allowErrors?: boolean
+      environmentKeys?: Array<string>
+      passphrase?: string
+      humanConfirmed?: true
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "headers", key: "idempotency-key" },
+            { in: "query", key: "directory" },
+            { in: "body", key: "protocolId" },
+            { in: "body", key: "notebookPath" },
+            { in: "body", key: "parameters" },
+            { in: "body", key: "seed" },
+            { in: "body", key: "timeoutMs" },
+            { in: "body", key: "allowErrors" },
+            { in: "body", key: "environmentKeys" },
+            { in: "body", key: "passphrase" },
+            { in: "body", key: "humanConfirmed" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      ResearchRunNotebookDeclareResponses,
+      ResearchRunNotebookDeclareErrors,
+      ThrowOnError
+    >({
+      url: "/research/runs/notebooks",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+}
+
+export class Run extends HeyApiClient {
+  /**
+   * List formal run attempts
+   */
+  public list<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      iterationId?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "iterationId" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<ResearchRunListResponses, unknown, ThrowOnError>({
+      url: "/research/runs",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Capture provenance and declare a formal run intent
+   */
+  public declare<ThrowOnError extends boolean = false>(
+    parameters: {
+      "idempotency-key": string
+      directory?: string
+      protocolId?: string
+      parameters?: unknown
+      seed?: number
+      execution?: {
+        command: string
+        args?: Array<string>
+        cwd?: string
+        timeoutMs?: number
+        environmentKeys?: Array<string>
+      }
+      passphrase?: string
+      humanConfirmed?: true
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "headers", key: "idempotency-key" },
+            { in: "query", key: "directory" },
+            { in: "body", key: "protocolId" },
+            { in: "body", key: "parameters" },
+            { in: "body", key: "seed" },
+            { in: "body", key: "execution" },
+            { in: "body", key: "passphrase" },
+            { in: "body", key: "humanConfirmed" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<ResearchRunDeclareResponses, ResearchRunDeclareErrors, ThrowOnError>({
+      url: "/research/runs",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Execute one declared run through the controlled Conda runner
+   */
+  public execute<ThrowOnError extends boolean = false>(
+    parameters: {
+      runId: string
+      directory?: string
+      passphrase?: string
+      humanConfirmed?: true
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "runId" },
+            { in: "query", key: "directory" },
+            { in: "body", key: "passphrase" },
+            { in: "body", key: "humanConfirmed" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<ResearchRunExecuteResponses, ResearchRunExecuteErrors, ThrowOnError>({
+      url: "/research/runs/{runId}/execute",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  private _notebook?: Notebook
+  get notebook(): Notebook {
+    return (this._notebook ??= new Notebook({ client: this.client }))
+  }
+}
+
+export class Research extends HeyApiClient {
+  /**
+   * Get OpenScience Research status
+   */
+  public status<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams([parameters], [{ args: [{ in: "query", key: "directory" }] }])
+    return (options?.client ?? this.client).get<ResearchStatusResponses, unknown, ThrowOnError>({
+      url: "/research",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Verify and read the local research ledger
+   */
+  public ledger<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams([parameters], [{ args: [{ in: "query", key: "directory" }] }])
+    return (options?.client ?? this.client).get<ResearchLedgerResponses, unknown, ThrowOnError>({
+      url: "/research/ledger",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Adopt the current Git repository as a research project
+   */
+  public initialize<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      name?: string
+      description?: string
+      createCondaEnvironment?: boolean
+      passphrase?: string
+      humanConfirmed?: true
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "body", key: "name" },
+            { in: "body", key: "description" },
+            { in: "body", key: "createCondaEnvironment" },
+            { in: "body", key: "passphrase" },
+            { in: "body", key: "humanConfirmed" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<ResearchInitializeResponses, ResearchInitializeErrors, ThrowOnError>({
+      url: "/research/initialize",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  private _track?: Track
+  get track(): Track {
+    return (this._track ??= new Track({ client: this.client }))
+  }
+
+  private _iteration?: Iteration
+  get iteration(): Iteration {
+    return (this._iteration ??= new Iteration({ client: this.client }))
+  }
+
+  private _protocol?: Protocol
+  get protocol(): Protocol {
+    return (this._protocol ??= new Protocol({ client: this.client }))
+  }
+
+  private _environment?: Environment
+  get environment(): Environment {
+    return (this._environment ??= new Environment({ client: this.client }))
+  }
+
+  private _run?: Run
+  get run(): Run {
+    return (this._run ??= new Run({ client: this.client }))
+  }
+}
+
 export class Instance extends HeyApiClient {
   /**
    * Dispose instance
@@ -3914,6 +4592,93 @@ export class OpenScienceClient extends HeyApiClient {
     OpenScienceClient.__registry.set(this, args?.key)
   }
 
+  public postSettingsLocalStart<ThrowOnError extends boolean = false>(
+    parameters?: {
+      id?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams([parameters], [{ args: [{ in: "body", key: "id" }] }])
+    return (options?.client ?? this.client).post<PostSettingsLocalStartResponses, unknown, ThrowOnError>({
+      url: "/settings/local/start",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  public postSettingsLocalModels<ThrowOnError extends boolean = false>(
+    parameters?: {
+      url?: string
+      key?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "body", key: "url" },
+            { in: "body", key: "key" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<PostSettingsLocalModelsResponses, unknown, ThrowOnError>({
+      url: "/settings/local/models",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  public postSettingsLocal<ThrowOnError extends boolean = false>(
+    parameters?: {
+      url?: string
+      id?: string
+      name?: string
+      key?: string
+      models?: Array<string>
+      setDefault?: boolean
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "body", key: "url" },
+            { in: "body", key: "id" },
+            { in: "body", key: "name" },
+            { in: "body", key: "key" },
+            { in: "body", key: "models" },
+            { in: "body", key: "setDefault" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<PostSettingsLocalResponses, unknown, ThrowOnError>({
+      url: "/settings/local",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
   private _global?: Global
   get global(): Global {
     return (this._global ??= new Global({ client: this.client }))
@@ -4002,6 +4767,11 @@ export class OpenScienceClient extends HeyApiClient {
   private _mcp?: Mcp
   get mcp(): Mcp {
     return (this._mcp ??= new Mcp({ client: this.client }))
+  }
+
+  private _research?: Research
+  get research(): Research {
+    return (this._research ??= new Research({ client: this.client }))
   }
 
   private _instance?: Instance

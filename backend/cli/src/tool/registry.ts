@@ -35,6 +35,7 @@ import { ScienceTools } from "./science"
 import { ProvenanceTools } from "./provenance"
 import { NotebookTool } from "./notebook"
 import { RKernelTool } from "./rkernel"
+import { ResearchTools, RESEARCH_TOOL_IDS } from "./research"
 
 export namespace ToolRegistry {
   const log = Log.create({ service: "tool.registry" })
@@ -131,6 +132,7 @@ export namespace ToolRegistry {
       ...BiologyTools,
       ...ScienceTools,
       ...ProvenanceTools,
+      ...ResearchTools,
       NotebookTool,
       RKernelTool,
       ArtifactTool,
@@ -161,6 +163,8 @@ export namespace ToolRegistry {
           if (BIOLOGY_TOOL_IDS.has(t.id)) {
             return agent?.name === "biology"
           }
+
+          if (RESEARCH_TOOL_IDS.has(t.id)) return agent?.name === "research"
 
           // Artifact tool: only for artifact-oriented scientific agents.
           if (t.id === ARTIFACT_TOOL_ID) {
