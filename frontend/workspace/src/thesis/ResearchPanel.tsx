@@ -11,6 +11,7 @@ import {
   type EnvironmentIsolationResult,
   type TrackEnvironment,
 } from "@/thesis/EnvironmentIsolation"
+import { EvidencePanel } from "@/thesis/EvidencePanel"
 
 interface ResearchProject {
   id: string
@@ -502,6 +503,10 @@ export function ResearchPanel(): JSX.Element {
                 <div style={quiet}>No iterations yet. Start by declaring what this study should learn or decide.</div>
               </Show>
             </div>
+            <EvidencePanel
+              iterations={(iterations() ?? []).map((item) => ({ id: item.id, title: item.title }))}
+              disabled={status()?.readOnly}
+            />
           </Match>
         </Switch>
       </main>
