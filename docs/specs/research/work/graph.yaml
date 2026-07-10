@@ -76,7 +76,7 @@ packets:
       - run-envelope
 
   WP-06-NOTEBOOK:
-    status: pending
+    status: partial
     spec: "05"
     depends_on: [WP-05-RUNNER]
     owns:

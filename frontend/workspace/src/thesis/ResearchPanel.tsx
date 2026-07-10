@@ -1,8 +1,16 @@
-import { createResource, createSignal, For, Match, Show, Switch, type JSX } from "solid-js"
+import { createResource, createSignal, For, Match, onCleanup, Show, Switch, type JSX } from "solid-js"
 import { createStore } from "solid-js/store"
 import { useSDK } from "@/context/sdk"
 import { FONT_MONO, FONT_SANS } from "@/styles/tokens"
 import { IconBookOpen, IconCheckCircle, IconRefresh } from "@/thesis/shared/Icon"
+import { IterationComposer } from "@/thesis/IterationComposer"
+import { ProtocolReview, type ResearchProtocol } from "@/thesis/ProtocolReview"
+import { RunCard, RunComposer, type ResearchRun } from "@/thesis/FormalRunPanel"
+import {
+  EnvironmentIsolation,
+  type EnvironmentIsolationResult,
+  type TrackEnvironment,
+} from "@/thesis/EnvironmentIsolation"
 
 interface ResearchProject {
   id: string
@@ -29,6 +37,15 @@ interface ResearchTrack {
   hidden: boolean
 }
 
+interface ResearchIteration {
+  id: string
+  trackId: string
+  title: string
+  mode: "exploratory" | "confirmatory" | "replication" | "benchmark"
+  question: string
+  state: string
+}
+
 async function response<T>(request: Promise<Response>): Promise<T> {
   const value = await request
   if (value.ok) return value.json()
@@ -45,6 +62,24 @@ export function ResearchPanel(): JSX.Element {
     () => status()?.initialized,
     (initialized) => (initialized ? response<ResearchTrack[]>(fetch(endpoint("/tracks"))) : Promise.resolve([])),
   )
+  const [iterations, { refetch: refetchIterations }] = createResource(
+    () => status()?.initialized,
+    (initialized) =>
+      initialized ? response<ResearchIteration[]>(fetch(endpoint("/iterations"))) : Promise.resolve([]),
+  )
+  const [protocols, { refetch: refetchProtocols }] = createResource(
+    () => status()?.initialized,
+    (initialized) => (initialized ? response<ResearchProtocol[]>(fetch(endpoint("/protocols"))) : Promise.resolve([])),
+  )
+  const [runs, { refetch: refetchRuns }] = createResource(
+    () => status()?.initialized,
+    (initialized) => (initialized ? response<ResearchRun[]>(fetch(endpoint("/runs"))) : Promise.resolve([])),
+  )
+  const [environments, { refetch: refetchEnvironments }] = createResource(
+    () => status()?.initialized,
+    (initialized) =>
+      initialized ? response<TrackEnvironment[]>(fetch(endpoint("/environments"))) : Promise.resolve([]),
+  )
   const [setup, setSetup] = createStore({
     name: "",
     description: "",
@@ -56,6 +91,31 @@ export function ResearchPanel(): JSX.Element {
   const [error, setError] = createSignal("")
   const [needsPassphrase, setNeedsPassphrase] = createSignal(false)
   const [showTrack, setShowTrack] = createSignal(false)
+  const [showIteration, setShowIteration] = createSignal(false)
+  const [trackMutationKey, setTrackMutationKey] = createSignal("")
+  const [selectedProtocol, setSelectedProtocol] = createSignal("")
+  const [isolatingTrack, setIsolatingTrack] = createSignal("")
+  const [environmentNotice, setEnvironmentNotice] = createSignal("")
+  const [liveOperation, setLiveOperation] = createSignal<{ kind: string; state: string }>()
+
+  const subscriptions = [
+    sdk.event.on("research.operation.updated", (event) => {
+      setLiveOperation({ kind: event.properties.kind, state: event.properties.state })
+    }),
+    sdk.event.on("research.track.updated", () => {
+      void Promise.all([refetch(), refetchTracks(), refetchEnvironments()])
+    }),
+    sdk.event.on("research.iteration.updated", () => {
+      void Promise.all([refetch(), refetchIterations(), refetchProtocols()])
+    }),
+    sdk.event.on("research.run.updated", () => {
+      void Promise.all([refetch(), refetchRuns()])
+    }),
+    sdk.event.on("research.audit.updated", () => {
+      void refetch()
+    }),
+  ]
+  onCleanup(() => subscriptions.forEach((unsubscribe) => unsubscribe()))
 
   const initialize = async (event: SubmitEvent) => {
     event.preventDefault()
@@ -90,11 +150,13 @@ export function ResearchPanel(): JSX.Element {
     event.preventDefault()
     setBusy(true)
     setError("")
+    const idempotencyKey = trackMutationKey() || crypto.randomUUID()
+    setTrackMutationKey(idempotencyKey)
     try {
       await response(
         fetch(endpoint("/tracks"), {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", "Idempotency-Key": idempotencyKey },
           body: JSON.stringify({
             title: track.title,
             objective: track.objective,
@@ -105,6 +167,7 @@ export function ResearchPanel(): JSX.Element {
         }),
       )
       setTrack({ title: "", objective: "" })
+      setTrackMutationKey("")
       setShowTrack(false)
       await Promise.all([refetch(), refetchTracks()])
     } catch (cause) {
@@ -123,10 +186,28 @@ export function ResearchPanel(): JSX.Element {
           <IconBookOpen size={15} strokeWidth={1.5} />
           <div>
             <div style={title}>OpenScience Research</div>
-            <div style={subtitle}>Powered by SMAIRT methodology</div>
+            <div style={subtitle}>
+              <Show when={liveOperation()} fallback="Powered by SMAIRT methodology">
+                {(operation) => `${operation().kind} · ${operation().state}`}
+              </Show>
+            </div>
           </div>
         </div>
-        <button type="button" title="refresh research status" onClick={() => void refetch()} style={iconButton}>
+        <button
+          type="button"
+          title="refresh research status"
+          onClick={() =>
+            void Promise.all([
+              refetch(),
+              refetchTracks(),
+              refetchIterations(),
+              refetchProtocols(),
+              refetchRuns(),
+              refetchEnvironments(),
+            ])
+          }
+          style={iconButton}
+        >
           <IconRefresh size={13} strokeWidth={1.5} />
         </button>
       </header>
@@ -280,19 +361,145 @@ export function ResearchPanel(): JSX.Element {
               </form>
             </Show>
             <div style={{ display: "grid", gap: "8px" }}>
+              <Show when={environmentNotice()}>
+                <div role="status" style={projectCard}>
+                  {environmentNotice()}
+                </div>
+              </Show>
               <For each={(tracks() ?? []).filter((item) => !item.hidden)}>
-                {(item) => (
-                  <article style={trackCard}>
-                    <div style={{ display: "flex", "align-items": "center", gap: "8px" }}>
-                      <span style={statePill}>{item.state}</span>
-                      <strong style={{ "font-family": FONT_SANS, "font-size": "13px" }}>{item.title}</strong>
-                    </div>
-                    <p style={{ ...copy, margin: "7px 0 0" }}>{item.objective}</p>
-                  </article>
-                )}
+                {(item) => {
+                  const environment = () => (environments() ?? []).find((value) => value.trackId === item.id)
+                  return (
+                    <article style={trackCard}>
+                      <div style={{ display: "flex", "align-items": "center", gap: "8px" }}>
+                        <span style={statePill}>{item.state}</span>
+                        <strong style={{ "font-family": FONT_SANS, "font-size": "13px" }}>{item.title}</strong>
+                      </div>
+                      <p style={{ ...copy, margin: "7px 0 0" }}>{item.objective}</p>
+                      <Show when={environment()}>
+                        {(binding) => (
+                          <div style={{ display: "flex", "align-items": "center", gap: "7px", "margin-top": "9px" }}>
+                            <span style={statePill}>conda · {binding().state}</span>
+                            <span style={subtitle}>{binding().name}</span>
+                            <Show when={binding().state === "inherited"}>
+                              <button
+                                type="button"
+                                disabled={status()?.readOnly}
+                                onClick={() => setIsolatingTrack(item.id)}
+                                style={{ ...secondaryButton, "margin-left": "auto" }}
+                              >
+                                Isolate environment
+                              </button>
+                            </Show>
+                          </div>
+                        )}
+                      </Show>
+                      <Show when={isolatingTrack() === item.id && environment()}>
+                        {(binding) => (
+                          <EnvironmentIsolation
+                            trackId={item.id}
+                            current={binding()}
+                            onCancel={() => setIsolatingTrack("")}
+                            onIsolated={async (result: EnvironmentIsolationResult) => {
+                              setIsolatingTrack("")
+                              setEnvironmentNotice(
+                                `Created ${result.environment.name}. Provision when ready: ${result.provision.command} ${result.provision.args.join(" ")}`,
+                              )
+                              await Promise.all([refetch(), refetchEnvironments()])
+                            }}
+                          />
+                        )}
+                      </Show>
+                    </article>
+                  )
+                }}
               </For>
               <Show when={(tracks() ?? []).filter((item) => !item.hidden).length === 0}>
                 <div style={quiet}>No parallel tracks yet. The core track is active in the background.</div>
+              </Show>
+            </div>
+
+            <div style={sectionHeader}>
+              <div>
+                <div style={title}>Iterations and protocols</div>
+                <div style={subtitle}>Declare intent before formal execution.</div>
+              </div>
+              <button
+                type="button"
+                disabled={status()?.readOnly || (tracks() ?? []).length === 0}
+                onClick={() => setShowIteration((value) => !value)}
+                style={secondaryButton}
+              >
+                {showIteration() ? "Cancel" : "New iteration"}
+              </button>
+            </div>
+            <Show when={showIteration()}>
+              <IterationComposer
+                tracks={(tracks() ?? []).map((item) => ({
+                  id: item.id,
+                  title: item.hidden ? "Primary approach" : item.title,
+                }))}
+                onCancel={() => setShowIteration(false)}
+                onCreated={async () => {
+                  setShowIteration(false)
+                  await Promise.all([refetch(), refetchIterations(), refetchProtocols()])
+                }}
+              />
+            </Show>
+            <div style={{ display: "grid", gap: "8px" }}>
+              <For each={iterations() ?? []}>
+                {(item) => (
+                  <article style={trackCard}>
+                    <div style={{ display: "flex", "align-items": "center", gap: "8px" }}>
+                      <span style={statePill}>{item.mode}</span>
+                      <strong style={{ "font-family": FONT_SANS, "font-size": "13px" }}>{item.title}</strong>
+                      <span style={{ ...subtitle, "margin-left": "auto" }}>{item.state}</span>
+                    </div>
+                    <p style={{ ...copy, margin: "7px 0 0" }}>{item.question}</p>
+                    <For each={(protocols() ?? []).filter((protocol) => protocol.iterationId === item.id)}>
+                      {(protocol) => (
+                        <ProtocolReview
+                          protocol={protocol}
+                          disabled={status()?.readOnly}
+                          onFrozen={async () => {
+                            await Promise.all([refetch(), refetchIterations(), refetchProtocols()])
+                          }}
+                          onNewRun={() => setSelectedProtocol(protocol.id)}
+                        />
+                      )}
+                    </For>
+                    <Show
+                      when={(protocols() ?? []).find(
+                        (protocol) => protocol.id === selectedProtocol() && protocol.iterationId === item.id,
+                      )}
+                    >
+                      {(protocol) => (
+                        <RunComposer
+                          protocolId={protocol().id}
+                          onCancel={() => setSelectedProtocol("")}
+                          onDeclared={async () => {
+                            setSelectedProtocol("")
+                            await Promise.all([refetch(), refetchRuns()])
+                          }}
+                        />
+                      )}
+                    </Show>
+                    <For each={(runs() ?? []).filter((run) => run.iterationId === item.id)}>
+                      {(run) => (
+                        <RunCard
+                          run={run}
+                          disabled={status()?.readOnly}
+                          onUpdated={async () => {
+                            await Promise.all([refetch(), refetchRuns()])
+                          }}
+                        />
+                      )}
+                    </For>
+                  </article>
+                )}
+              </For>
+              <Show when={(iterations() ?? []).length === 0}>
+                <div style={quiet}>No iterations yet. Start by declaring what this study should learn or decide.</div>
               </Show>
             </div>
           </Match>
