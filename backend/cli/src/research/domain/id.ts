@@ -10,6 +10,7 @@ export const ResearchIDKind = {
   protocol: "rsc",
   run: "rsr",
   artifact: "rsa",
+  analysis: "rsn",
   member: "rsm",
   event: "rse",
   approval: "rsv",

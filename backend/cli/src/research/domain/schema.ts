@@ -213,6 +213,34 @@ export const RunAttempt = RecordBase.extend({
 }).strict()
 export type RunAttempt = z.infer<typeof RunAttempt>
 
+export const ArtifactManifest = RecordBase.extend({
+  id: ResearchID.schema("artifact"),
+  iterationId: ResearchID.schema("iteration"),
+  runId: ResearchID.schema("run").nullable(),
+  path: z.string().min(1),
+  role: z.enum(["input", "output", "dataset", "model", "figure", "table", "notebook", "log", "other"]),
+  mediaType: z.string().min(1),
+  byteLength: z.number().int().nonnegative(),
+  contentHash: Hash,
+  captureConfidence: z.enum(["complete", "best_effort"]),
+}).strict()
+export type ArtifactManifest = z.infer<typeof ArtifactManifest>
+
+export const ScientificAnalysis = RecordBase.extend({
+  id: ResearchID.schema("analysis"),
+  iterationId: ResearchID.schema("iteration"),
+  title: z.string().min(1).max(300),
+  summary: z.string().min(1).max(24000),
+  methods: z.string().min(1).max(24000),
+  findings: z.array(z.string().min(1).max(8000)).min(1),
+  limitations: z.array(z.string().min(1).max(8000)).min(1),
+  runIds: z.array(ResearchID.schema("run")),
+  artifactIds: z.array(ResearchID.schema("artifact")),
+  state: z.enum(["draft", "finalized"]),
+  finalizedAt: Timestamp.nullable(),
+}).strict()
+export type ScientificAnalysis = z.infer<typeof ScientificAnalysis>
+
 export const WorkspaceBinding = RecordBase.extend({
   id: ResearchID.schema("workspace"),
   trackId: ResearchID.schema("track"),
