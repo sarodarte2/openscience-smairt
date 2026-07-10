@@ -2,13 +2,25 @@ import path from "node:path"
 import { access, mkdir, open, readFile, rename, writeFile } from "node:fs/promises"
 import { Canonical, type JsonValue } from "../domain/canonical"
 import { ResearchID } from "../domain/id"
-import { ProjectMember, ResearchProject, ResearchTrack, WorkspaceBinding, type Actor } from "../domain/schema"
+import {
+  ProjectMember,
+  ResearchProject,
+  ResearchTrack,
+  TrackEnvironment,
+  WorkspaceBinding,
+  type Actor,
+} from "../domain/schema"
 import type { Signer } from "../domain/signature"
 import { FilesystemLedger } from "../adapters/ledger/filesystem"
 import { LocalGit } from "../adapters/git/local"
 import { CondaEnvironment } from "../adapters/environment/conda"
 
-const IGNORE = [".openscience/research/cache/", ".openscience/research/private/", ".openscience/research/.write.lock/"]
+const IGNORE = [
+  ".openscience/research/cache/",
+  ".openscience/research/private/",
+  ".openscience/research/runs/",
+  ".openscience/research/.write.lock/",
+]
 
 async function exists(file: string) {
   return access(file)
@@ -122,6 +134,19 @@ export namespace ResearchProjectService {
       createdAt: now,
       createdBy: input.actor,
     })
+    const trackEnvironment = TrackEnvironment.parse({
+      schemaVersion: 1,
+      projectId,
+      trackId: coreTrackId,
+      kind: "conda",
+      name: environment.name,
+      portableSpecPath: path.relative(git.root, environment.file),
+      portableSpecHash: environment.specHash,
+      state: "base",
+      inheritedFromTrackId: null,
+      createdAt: now,
+      createdBy: input.actor,
+    })
 
     await FilesystemLedger.appendBatch({
       projectRoot: git.root,
@@ -130,7 +155,7 @@ export namespace ResearchProjectService {
       signer: input.signer,
       entries: [
         { type: "project.created", payload: { project, owner: member, environment }, occurredAt: now },
-        { type: "track.created", payload: { track, binding }, occurredAt: now },
+        { type: "track.created", payload: { track, binding, environment: trackEnvironment }, occurredAt: now },
       ],
     })
 
@@ -144,7 +169,11 @@ export namespace ResearchProjectService {
       path.join(git.root, `.openscience/research/projections/workspaces/${binding.id}.json`),
       binding as JsonValue,
     )
+    await atomicJson(
+      path.join(git.root, `.openscience/research/projections/environments/tracks/${coreTrackId}.json`),
+      trackEnvironment as JsonValue,
+    )
     await updateIgnore(git.root)
-    return { project, track, member, binding, environment, root: git.root }
+    return { project, track, member, binding, environment, trackEnvironment, root: git.root }
   }
 }

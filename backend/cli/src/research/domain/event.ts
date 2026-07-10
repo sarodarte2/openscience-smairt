@@ -15,6 +15,13 @@ export const EventSignature = z
   })
   .strict()
 
+export const EventIdempotency = z
+  .object({
+    keyHash: Hash,
+    requestHash: Hash,
+  })
+  .strict()
+
 const UnsignedEvent = z
   .object({
     schemaVersion: z.literal(1),
@@ -26,6 +33,7 @@ const UnsignedEvent = z
     occurredAt: Timestamp,
     payload: Json,
     payloadHash: Hash,
+    idempotency: EventIdempotency.optional(),
   })
   .strict()
 
@@ -54,6 +62,7 @@ export namespace Event {
     actor: z.infer<typeof Actor>
     occurredAt: string
     payload: JsonValue
+    idempotency?: z.infer<typeof EventIdempotency>
     signer: Signer
   }): Promise<ResearchEvent> {
     const base = UnsignedEvent.parse({
@@ -66,6 +75,7 @@ export namespace Event {
       occurredAt: input.occurredAt,
       payload: input.payload,
       payloadHash: Canonical.hash(input.payload),
+      ...(input.idempotency ? { idempotency: input.idempotency } : {}),
     })
     const canonical = Canonical.stringify(unsigned(base))
     const contentHash = Canonical.hash(unsigned(base))

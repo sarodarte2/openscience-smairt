@@ -1,8 +1,8 @@
 import path from "node:path"
 import { spawn } from "node:child_process"
 import { createHash } from "node:crypto"
-import { createReadStream } from "node:fs"
-import { mkdir, open, realpath } from "node:fs/promises"
+import { constants, createReadStream } from "node:fs"
+import { copyFile, mkdir, open, realpath } from "node:fs/promises"
 import type { Readable } from "node:stream"
 
 export type ProcessOutcome = "succeeded" | "failed" | "timed_out" | "cancelled" | "lost"
@@ -36,7 +36,8 @@ function environment(keys: string[]) {
 }
 
 async function contained(root: string, cwd: string) {
-  const [parent, child] = await Promise.all([realpath(root), realpath(cwd)])
+  const requested = path.isAbsolute(cwd) ? cwd : path.resolve(root, cwd)
+  const [parent, child] = await Promise.all([realpath(root), realpath(requested)])
   const relative = path.relative(parent, child)
   if (relative.startsWith("..") || path.isAbsolute(relative))
     throw new Error("Formal runs must execute inside the project")
@@ -50,6 +51,10 @@ async function digest(file: string) {
 }
 
 export namespace LocalProcessRunner {
+  export function validateEnvironmentKeys(keys: string[]) {
+    environment(keys)
+  }
+
   export async function execute(input: {
     projectRoot: string
     runId: string
@@ -59,6 +64,7 @@ export namespace LocalProcessRunner {
     timeoutMs: number
     environmentKeys: string[]
     maxOutputBytes?: number
+    preserveInputs?: { sourcePath: string; destinationName: string; expectedHash: string }[]
     signal?: AbortSignal
   }): Promise<ProcessResult> {
     const cwd = await contained(input.projectRoot, input.cwd)
@@ -66,6 +72,16 @@ export namespace LocalProcessRunner {
     const directory = path.join(input.projectRoot, `.openscience/research/runs/${input.runId}`)
     await mkdir(path.dirname(directory), { recursive: true })
     await mkdir(directory, { recursive: false })
+    for (const preserved of input.preserveInputs ?? []) {
+      if (path.basename(preserved.destinationName) !== preserved.destinationName) {
+        throw new Error("Preserved input destination must be a filename")
+      }
+      const source = await contained(input.projectRoot, preserved.sourcePath)
+      if ((await digest(source)) !== preserved.expectedHash) {
+        throw new Error(`Preserved input ${preserved.sourcePath} changed after run declaration`)
+      }
+      await copyFile(source, path.join(directory, preserved.destinationName), constants.COPYFILE_EXCL)
+    }
     const stdoutFile = path.join(directory, "stdout.log")
     const stderrFile = path.join(directory, "stderr.log")
     const stdout = await open(stdoutFile, "wx", 0o600)

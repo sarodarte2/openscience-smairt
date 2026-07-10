@@ -128,6 +128,49 @@ export const ProtocolRevision = RecordBase.extend({
 }).strict()
 export type ProtocolRevision = z.infer<typeof ProtocolRevision>
 
+export const WorkspaceSnapshot = z
+  .object({
+    kind: z.literal("git"),
+    branch: z.string().min(1),
+    commit: z
+      .string()
+      .regex(/^[0-9a-f]{40,64}$/)
+      .nullable(),
+    dirty: z.boolean(),
+    statusHash: Hash,
+    trackedFilesHash: Hash,
+    untrackedFilesHash: Hash,
+    captureConfidence: z.enum(["complete", "best_effort"]),
+  })
+  .strict()
+export type WorkspaceSnapshot = z.infer<typeof WorkspaceSnapshot>
+
+export const EnvironmentSnapshot = z
+  .object({
+    kind: z.literal("conda"),
+    name: z.string().min(1),
+    portableSpecPath: z.string().min(1),
+    portableSpecHash: Hash,
+    resolvedSpecPath: z.string().min(1),
+    resolvedSpecHash: Hash,
+    platform: z.string().min(1),
+    captureConfidence: z.enum(["complete", "credential_redacted"]),
+  })
+  .strict()
+export type EnvironmentSnapshot = z.infer<typeof EnvironmentSnapshot>
+
+export const NotebookRun = z
+  .object({
+    sourcePath: z.string().min(1),
+    sourceHash: Hash,
+    originalPath: z.string().min(1),
+    executedPath: z.string().min(1),
+    executedHash: Hash.nullable(),
+    allowErrors: z.boolean(),
+  })
+  .strict()
+export type NotebookRun = z.infer<typeof NotebookRun>
+
 export const RunAttempt = RecordBase.extend({
   id: ResearchID.schema("run"),
   iterationId: ResearchID.schema("iteration"),
@@ -135,6 +178,10 @@ export const RunAttempt = RecordBase.extend({
   intentEventId: ResearchID.schema("event"),
   workspaceStateHash: Hash,
   environmentHash: Hash,
+  workspace: WorkspaceSnapshot,
+  environment: EnvironmentSnapshot,
+  kind: z.enum(["command", "notebook"]).default("command"),
+  notebook: NotebookRun.nullable().default(null),
   parameters: Json,
   seed: z.number().int().optional(),
   execution: z
@@ -179,6 +226,17 @@ export const WorkspaceBinding = RecordBase.extend({
   active: z.boolean(),
 }).strict()
 export type WorkspaceBinding = z.infer<typeof WorkspaceBinding>
+
+export const TrackEnvironment = RecordBase.extend({
+  trackId: ResearchID.schema("track"),
+  kind: z.literal("conda"),
+  name: z.string().min(1),
+  portableSpecPath: z.string().min(1),
+  portableSpecHash: Hash,
+  state: z.enum(["base", "inherited", "diverged"]),
+  inheritedFromTrackId: ResearchID.schema("track").nullable(),
+}).strict()
+export type TrackEnvironment = z.infer<typeof TrackEnvironment>
 
 export const MemberRole = z.enum(["owner", "researcher", "reviewer", "viewer"])
 

@@ -34,5 +34,11 @@ describe("Research governance", () => {
       ),
     ).toBeFalse()
     expect(Governance.can(context, ResearchCapability.foundationPromote)).toBeFalse()
+    expect(
+      Governance.can(
+        { ...context, delegatedCapabilities: [ResearchCapability.environmentManage] },
+        ResearchCapability.environmentManage,
+      ),
+    ).toBeFalse()
   })
 })

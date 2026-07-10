@@ -48,6 +48,12 @@ export class LedgerProjectMismatchError extends Error {
   }
 }
 
+export class IdempotencyConflictError extends Error {
+  constructor(readonly keyHash: string) {
+    super("Idempotency key was already used for a different research mutation")
+  }
+}
+
 const ROOT = ".openscience/research"
 
 function paths(projectRoot: string) {
@@ -57,6 +63,22 @@ function paths(projectRoot: string) {
     events: path.join(root, "ledger/events"),
     lock: path.join(root, ".write.lock"),
   }
+}
+
+function idempotency(projectId: string, key: string, request: JsonValue) {
+  return {
+    keyHash: Canonical.hash({ projectId, key }),
+    requestHash: Canonical.hash(request),
+  }
+}
+
+function replay(snapshot: LedgerSnapshot, type: string, value: { keyHash: string; requestHash: string }) {
+  const event = snapshot.events.find((candidate) => candidate.idempotency?.keyHash === value.keyHash)
+  if (!event) return null
+  if (event.type !== type || event.idempotency?.requestHash !== value.requestHash) {
+    throw new IdempotencyConflictError(value.keyHash)
+  }
+  return event
 }
 
 function wait(duration: number) {
@@ -232,6 +254,7 @@ export namespace FilesystemLedger {
   export async function append(input: {
     projectRoot: string
     projectId: string
+    eventId?: string
     type: string
     actor: Actor
     payload: JsonValue
@@ -246,7 +269,7 @@ export namespace FilesystemLedger {
     const snapshot = await read(input.projectRoot)
     assertWritable(snapshot, input.projectId)
     const event = await Event.create({
-      eventId: ResearchID.create("event"),
+      eventId: input.eventId ? ResearchID.schema("event").parse(input.eventId) : ResearchID.create("event"),
       projectId: input.projectId,
       type: input.type,
       parents: input.parents ?? snapshot.heads,
@@ -257,6 +280,72 @@ export namespace FilesystemLedger {
     })
     await persist(input.projectRoot, event)
     return event
+  }
+
+  export async function lookupIdempotency(input: {
+    projectRoot: string
+    projectId: string
+    type: string
+    key: string
+    request: JsonValue
+  }) {
+    const snapshot = await read(input.projectRoot)
+    assertWritable(snapshot, input.projectId)
+    return replay(snapshot, input.type, idempotency(input.projectId, input.key, input.request))
+  }
+
+  export async function withIdempotencyLock<T>(input: {
+    projectRoot: string
+    projectId: string
+    key: string
+    lockTimeoutMs?: number
+    operation: () => Promise<T>
+  }) {
+    const value = idempotency(input.projectId, input.key, null)
+    const directory = path.join(paths(input.projectRoot).root, "cache/idempotency-locks")
+    await mkdir(directory, { recursive: true })
+    await using lock = await acquire(
+      path.join(directory, value.keyHash + ".lock"),
+      Date.now() + (input.lockTimeoutMs ?? 5000),
+    )
+    return input.operation()
+  }
+
+  export async function appendIdempotent(input: {
+    projectRoot: string
+    projectId: string
+    eventId?: string
+    type: string
+    actor: Actor
+    payload: JsonValue
+    signer: Signer
+    key: string
+    request: JsonValue
+    parents?: EventParent[]
+    occurredAt?: string
+    lockTimeoutMs?: number
+  }): Promise<{ event: ResearchEvent; replayed: boolean }> {
+    const project = paths(input.projectRoot)
+    await mkdir(project.root, { recursive: true })
+    await using lock = await acquire(project.lock, Date.now() + (input.lockTimeoutMs ?? 5000))
+    const snapshot = await read(input.projectRoot)
+    assertWritable(snapshot, input.projectId)
+    const value = idempotency(input.projectId, input.key, input.request)
+    const existing = replay(snapshot, input.type, value)
+    if (existing) return { event: existing, replayed: true }
+    const event = await Event.create({
+      eventId: input.eventId ? ResearchID.schema("event").parse(input.eventId) : ResearchID.create("event"),
+      projectId: input.projectId,
+      type: input.type,
+      parents: input.parents ?? snapshot.heads,
+      actor: input.actor,
+      occurredAt: input.occurredAt ?? new Date().toISOString(),
+      payload: input.payload,
+      idempotency: value,
+      signer: input.signer,
+    })
+    await persist(input.projectRoot, event)
+    return { event, replayed: false }
   }
 
   export async function appendBatch(input: {

@@ -2,7 +2,12 @@ import { afterEach, beforeEach, describe, expect, it } from "bun:test"
 import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
-import { FilesystemLedger, LedgerIntegrityError, LedgerProjectMismatchError } from "../adapters/ledger/filesystem"
+import {
+  FilesystemLedger,
+  IdempotencyConflictError,
+  LedgerIntegrityError,
+  LedgerProjectMismatchError,
+} from "../adapters/ledger/filesystem"
 import { ResearchID } from "../domain/id"
 import { Ed25519 } from "../domain/signature"
 
@@ -93,5 +98,43 @@ describe("Filesystem research ledger", () => {
         signer,
       }),
     ).rejects.toBeInstanceOf(LedgerProjectMismatchError)
+  })
+
+  it("replays one mutation for the same idempotency key and rejects changed input", async () => {
+    const first = await FilesystemLedger.appendIdempotent({
+      projectRoot: root,
+      projectId,
+      type: "track.created",
+      actor,
+      payload: { trackId: "stable-result" },
+      signer,
+      key: "request-12345678",
+      request: { title: "Alternative" },
+    })
+    const replayed = await FilesystemLedger.appendIdempotent({
+      projectRoot: root,
+      projectId,
+      type: "track.created",
+      actor,
+      payload: { trackId: "would-have-been-different" },
+      signer,
+      key: "request-12345678",
+      request: { title: "Alternative" },
+    })
+    expect(first.replayed).toBeFalse()
+    expect(replayed).toEqual({ event: first.event, replayed: true })
+    expect((await FilesystemLedger.inspect(root)).events).toHaveLength(1)
+    await expect(
+      FilesystemLedger.appendIdempotent({
+        projectRoot: root,
+        projectId,
+        type: "track.created",
+        actor,
+        payload: { trackId: "conflict" },
+        signer,
+        key: "request-12345678",
+        request: { title: "Changed" },
+      }),
+    ).rejects.toBeInstanceOf(IdempotencyConflictError)
   })
 })
