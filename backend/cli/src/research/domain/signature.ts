@@ -21,7 +21,13 @@ export interface Signer {
 }
 
 function fingerprint(publicKey: string) {
-  return createHash("sha256").update(Buffer.from(publicKey, "base64")).digest("hex")
+  return createHash("sha256").update(decode(publicKey)).digest("hex")
+}
+
+function decode(value: string) {
+  const bytes = Buffer.from(value, "base64")
+  if (bytes.toString("base64") !== value) throw new Error("Signature material must use canonical Base64")
+  return bytes
 }
 
 export namespace Ed25519 {
@@ -45,11 +51,11 @@ export namespace Ed25519 {
   }
 
   export function verify(content: string, signature: Signature) {
-    if (signature.algorithm !== "ed25519") return false
-    if (signature.keyId !== "sha256:" + fingerprint(signature.publicKey)) return false
     try {
-      const key = createPublicKey({ key: Buffer.from(signature.publicKey, "base64"), type: "spki", format: "der" })
-      return nodeVerify(null, Buffer.from(content, "utf8"), key, Buffer.from(signature.value, "base64"))
+      if (signature.algorithm !== "ed25519") return false
+      if (signature.keyId !== "sha256:" + fingerprint(signature.publicKey)) return false
+      const key = createPublicKey({ key: decode(signature.publicKey), type: "spki", format: "der" })
+      return nodeVerify(null, Buffer.from(content, "utf8"), key, decode(signature.value))
     } catch {
       return false
     }

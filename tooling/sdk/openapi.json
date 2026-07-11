@@ -9379,6 +9379,12 @@
                         },
                         "foundations": {
                           "type": "number"
+                        },
+                        "protocols": {
+                          "type": "number"
+                        },
+                        "runs": {
+                          "type": "number"
                         }
                       },
                       "required": [
@@ -9387,7 +9393,9 @@
                         "claims",
                         "reviews",
                         "integrations",
-                        "foundations"
+                        "foundations",
+                        "protocols",
+                        "runs"
                       ]
                     }
                   },
@@ -9405,6 +9413,1596 @@
           {
             "lang": "js",
             "source": "import { createOpenScienceClient } from \"@synsci/sdk\n\nconst client = createOpenScienceClient()\nawait client.research.audit({\n  ...\n})"
+          }
+        ]
+      }
+    },
+    "/research/adoption": {
+      "get": {
+        "operationId": "research.adoption.scan",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "directory",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "summary": "Scan an existing repository without changing it",
+        "responses": {
+          "200": {
+            "description": "Read-only adoption report",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "root": {
+                      "type": "string"
+                    },
+                    "initialized": {
+                      "type": "boolean"
+                    },
+                    "candidates": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "category": {
+                            "type": "string",
+                            "enum": [
+                              "environment",
+                              "notebook",
+                              "source",
+                              "data",
+                              "result",
+                              "document",
+                              "unknown"
+                            ]
+                          },
+                          "confidence": {
+                            "type": "string",
+                            "enum": [
+                              "captured",
+                              "attested",
+                              "imported-unverified"
+                            ]
+                          },
+                          "reason": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "category",
+                          "confidence",
+                          "reason"
+                        ]
+                      }
+                    },
+                    "recognized": {
+                      "type": "array",
+                      "items": {}
+                    },
+                    "uncertain": {
+                      "type": "array",
+                      "items": {}
+                    },
+                    "ignored": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "conflicts": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "counts": {
+                      "type": "object",
+                      "properties": {
+                        "scanned": {
+                          "type": "number"
+                        },
+                        "recognized": {
+                          "type": "number"
+                        },
+                        "uncertain": {
+                          "type": "number"
+                        },
+                        "conflicts": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "scanned",
+                        "recognized",
+                        "uncertain",
+                        "conflicts"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "root",
+                    "initialized",
+                    "candidates",
+                    "recognized",
+                    "uncertain",
+                    "ignored",
+                    "conflicts",
+                    "counts"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpenScienceClient } from \"@synsci/sdk\n\nconst client = createOpenScienceClient()\nawait client.research.adoption.scan({\n  ...\n})"
+          }
+        ]
+      }
+    },
+    "/research/exports": {
+      "post": {
+        "operationId": "research.export.create",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "directory",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "summary": "Create an integrity-verifiable RO-Crate-style research export",
+        "responses": {
+          "200": {
+            "description": "Export receipt",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "destination": {
+                      "type": "string"
+                    },
+                    "report": {},
+                    "fileCount": {
+                      "type": "number"
+                    },
+                    "manifest": {
+                      "type": "string",
+                      "const": "MANIFEST.sha256"
+                    }
+                  },
+                  "required": [
+                    "destination",
+                    "report",
+                    "fileCount",
+                    "manifest"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The local identity may not create exports"
+          },
+          "409": {
+            "description": "The destination already exists"
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "destination": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 8000
+                  },
+                  "passphrase": {
+                    "type": "string",
+                    "minLength": 12
+                  },
+                  "humanConfirmed": {
+                    "type": "boolean",
+                    "const": true
+                  }
+                },
+                "required": [
+                  "destination",
+                  "humanConfirmed"
+                ]
+              }
+            }
+          }
+        },
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpenScienceClient } from \"@synsci/sdk\n\nconst client = createOpenScienceClient()\nawait client.research.export.create({\n  ...\n})"
+          }
+        ]
+      }
+    },
+    "/research/members": {
+      "get": {
+        "operationId": "research.member.list",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "directory",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "summary": "List project members and roles",
+        "responses": {
+          "200": {
+            "description": "Project members",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "schemaVersion": {
+                        "type": "number",
+                        "const": 1
+                      },
+                      "projectId": {
+                        "type": "string"
+                      },
+                      "createdAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                      },
+                      "createdBy": {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "human",
+                              "agent",
+                              "system"
+                            ]
+                          },
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "displayName": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "delegationId": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "id",
+                          "displayName"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "id": {
+                        "type": "string"
+                      },
+                      "actorId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "displayName": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 200
+                      },
+                      "email": {
+                        "type": "string",
+                        "format": "email",
+                        "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                      },
+                      "gitName": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "gitEmail": {
+                        "type": "string",
+                        "format": "email",
+                        "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                      },
+                      "role": {
+                        "type": "string",
+                        "enum": [
+                          "owner",
+                          "researcher",
+                          "reviewer",
+                          "viewer"
+                        ]
+                      },
+                      "signingKeyId": {
+                        "type": "string",
+                        "pattern": "^sha256:.*"
+                      },
+                      "active": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "schemaVersion",
+                      "projectId",
+                      "createdAt",
+                      "createdBy",
+                      "id",
+                      "displayName",
+                      "role",
+                      "signingKeyId",
+                      "active"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpenScienceClient } from \"@synsci/sdk\n\nconst client = createOpenScienceClient()\nawait client.research.member.list({\n  ...\n})"
+          }
+        ]
+      },
+      "post": {
+        "operationId": "research.member.add",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "directory",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "idempotency-key",
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 200
+            },
+            "required": true
+          }
+        ],
+        "summary": "Add a project member by signing-key fingerprint",
+        "responses": {
+          "200": {
+            "description": "Signed membership record",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "member": {
+                      "type": "object",
+                      "properties": {
+                        "schemaVersion": {
+                          "type": "number",
+                          "const": 1
+                        },
+                        "projectId": {
+                          "type": "string"
+                        },
+                        "createdAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                        },
+                        "createdBy": {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": [
+                                "human",
+                                "agent",
+                                "system"
+                              ]
+                            },
+                            "id": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "displayName": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "delegationId": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "id",
+                            "displayName"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "id": {
+                          "type": "string"
+                        },
+                        "actorId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "displayName": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        },
+                        "email": {
+                          "type": "string",
+                          "format": "email",
+                          "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                        },
+                        "gitName": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "gitEmail": {
+                          "type": "string",
+                          "format": "email",
+                          "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                        },
+                        "role": {
+                          "type": "string",
+                          "enum": [
+                            "owner",
+                            "researcher",
+                            "reviewer",
+                            "viewer"
+                          ]
+                        },
+                        "signingKeyId": {
+                          "type": "string",
+                          "pattern": "^sha256:.*"
+                        },
+                        "active": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "schemaVersion",
+                        "projectId",
+                        "createdAt",
+                        "createdBy",
+                        "id",
+                        "displayName",
+                        "role",
+                        "signingKeyId",
+                        "active"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "eventId": {
+                      "type": "string"
+                    },
+                    "replayed": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "member",
+                    "eventId",
+                    "replayed"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an owner may manage membership"
+          },
+          "409": {
+            "description": "Membership or idempotency conflict"
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "displayName": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                  },
+                  "memberRole": {
+                    "type": "string",
+                    "enum": [
+                      "owner",
+                      "researcher",
+                      "reviewer",
+                      "viewer"
+                    ]
+                  },
+                  "signingKeyId": {
+                    "type": "string",
+                    "pattern": "^sha256:.*"
+                  },
+                  "passphrase": {
+                    "type": "string",
+                    "minLength": 12
+                  },
+                  "humanConfirmed": {
+                    "type": "boolean",
+                    "const": true
+                  }
+                },
+                "required": [
+                  "displayName",
+                  "memberRole",
+                  "signingKeyId",
+                  "humanConfirmed"
+                ]
+              }
+            }
+          }
+        },
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpenScienceClient } from \"@synsci/sdk\n\nconst client = createOpenScienceClient()\nawait client.research.member.add({\n  ...\n})"
+          }
+        ]
+      }
+    },
+    "/research/members/{memberId}/role": {
+      "patch": {
+        "operationId": "research.member.role",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "directory",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "memberId",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true
+          },
+          {
+            "in": "header",
+            "name": "idempotency-key",
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 200
+            },
+            "required": true
+          }
+        ],
+        "summary": "Change a member role without rewriting attribution history",
+        "responses": {
+          "200": {
+            "description": "Updated membership record",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "member": {
+                      "type": "object",
+                      "properties": {
+                        "schemaVersion": {
+                          "type": "number",
+                          "const": 1
+                        },
+                        "projectId": {
+                          "type": "string"
+                        },
+                        "createdAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                        },
+                        "createdBy": {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": [
+                                "human",
+                                "agent",
+                                "system"
+                              ]
+                            },
+                            "id": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "displayName": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "delegationId": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "id",
+                            "displayName"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "id": {
+                          "type": "string"
+                        },
+                        "actorId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "displayName": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        },
+                        "email": {
+                          "type": "string",
+                          "format": "email",
+                          "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                        },
+                        "gitName": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "gitEmail": {
+                          "type": "string",
+                          "format": "email",
+                          "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                        },
+                        "role": {
+                          "type": "string",
+                          "enum": [
+                            "owner",
+                            "researcher",
+                            "reviewer",
+                            "viewer"
+                          ]
+                        },
+                        "signingKeyId": {
+                          "type": "string",
+                          "pattern": "^sha256:.*"
+                        },
+                        "active": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "schemaVersion",
+                        "projectId",
+                        "createdAt",
+                        "createdBy",
+                        "id",
+                        "displayName",
+                        "role",
+                        "signingKeyId",
+                        "active"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "eventId": {
+                      "type": "string"
+                    },
+                    "replayed": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "member",
+                    "eventId",
+                    "replayed"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an owner may manage membership"
+          },
+          "409": {
+            "description": "The final owner or idempotency constraint blocks this change"
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "newRole": {
+                    "type": "string",
+                    "enum": [
+                      "owner",
+                      "researcher",
+                      "reviewer",
+                      "viewer"
+                    ]
+                  },
+                  "passphrase": {
+                    "type": "string",
+                    "minLength": 12
+                  },
+                  "humanConfirmed": {
+                    "type": "boolean",
+                    "const": true
+                  }
+                },
+                "required": [
+                  "newRole",
+                  "humanConfirmed"
+                ]
+              }
+            }
+          }
+        },
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpenScienceClient } from \"@synsci/sdk\n\nconst client = createOpenScienceClient()\nawait client.research.member.role({\n  ...\n})"
+          }
+        ]
+      }
+    },
+    "/research/members/{memberId}": {
+      "delete": {
+        "operationId": "research.member.remove",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "directory",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "memberId",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true
+          },
+          {
+            "in": "header",
+            "name": "idempotency-key",
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 200
+            },
+            "required": true
+          }
+        ],
+        "summary": "Remove a member prospectively while preserving historical attribution",
+        "responses": {
+          "200": {
+            "description": "Inactive membership record",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "member": {
+                      "type": "object",
+                      "properties": {
+                        "schemaVersion": {
+                          "type": "number",
+                          "const": 1
+                        },
+                        "projectId": {
+                          "type": "string"
+                        },
+                        "createdAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                        },
+                        "createdBy": {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": [
+                                "human",
+                                "agent",
+                                "system"
+                              ]
+                            },
+                            "id": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "displayName": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "delegationId": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "id",
+                            "displayName"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "id": {
+                          "type": "string"
+                        },
+                        "actorId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "displayName": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        },
+                        "email": {
+                          "type": "string",
+                          "format": "email",
+                          "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                        },
+                        "gitName": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "gitEmail": {
+                          "type": "string",
+                          "format": "email",
+                          "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                        },
+                        "role": {
+                          "type": "string",
+                          "enum": [
+                            "owner",
+                            "researcher",
+                            "reviewer",
+                            "viewer"
+                          ]
+                        },
+                        "signingKeyId": {
+                          "type": "string",
+                          "pattern": "^sha256:.*"
+                        },
+                        "active": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "schemaVersion",
+                        "projectId",
+                        "createdAt",
+                        "createdBy",
+                        "id",
+                        "displayName",
+                        "role",
+                        "signingKeyId",
+                        "active"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "eventId": {
+                      "type": "string"
+                    },
+                    "replayed": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "member",
+                    "eventId",
+                    "replayed"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an owner may manage membership"
+          },
+          "409": {
+            "description": "The final owner or idempotency constraint blocks removal"
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "passphrase": {
+                    "type": "string",
+                    "minLength": 12
+                  },
+                  "humanConfirmed": {
+                    "type": "boolean",
+                    "const": true
+                  }
+                },
+                "required": [
+                  "humanConfirmed"
+                ]
+              }
+            }
+          }
+        },
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpenScienceClient } from \"@synsci/sdk\n\nconst client = createOpenScienceClient()\nawait client.research.member.remove({\n  ...\n})"
+          }
+        ]
+      }
+    },
+    "/research/publications": {
+      "get": {
+        "operationId": "research.publication.list",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "directory",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "summary": "List evidence-linked publication records",
+        "responses": {
+          "200": {
+            "description": "Publication records",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "schemaVersion": {
+                        "type": "number",
+                        "const": 1
+                      },
+                      "projectId": {
+                        "type": "string"
+                      },
+                      "createdAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                      },
+                      "createdBy": {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "human",
+                              "agent",
+                              "system"
+                            ]
+                          },
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "displayName": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "delegationId": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "id",
+                          "displayName"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "id": {
+                        "type": "string"
+                      },
+                      "title": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 500
+                      },
+                      "abstract": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 24000
+                      },
+                      "claimIds": {
+                        "minItems": 1,
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "artifactIds": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "supportState": {
+                        "type": "string",
+                        "enum": [
+                          "approved",
+                          "unresolved"
+                        ]
+                      },
+                      "state": {
+                        "type": "string",
+                        "enum": [
+                          "draft",
+                          "approved"
+                        ]
+                      },
+                      "aiUseStatement": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 12000
+                      },
+                      "contributionStatement": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 12000
+                      },
+                      "approvedAt": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "schemaVersion",
+                      "projectId",
+                      "createdAt",
+                      "createdBy",
+                      "id",
+                      "title",
+                      "abstract",
+                      "claimIds",
+                      "artifactIds",
+                      "supportState",
+                      "state",
+                      "aiUseStatement",
+                      "contributionStatement",
+                      "approvedAt"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpenScienceClient } from \"@synsci/sdk\n\nconst client = createOpenScienceClient()\nawait client.research.publication.list({\n  ...\n})"
+          }
+        ]
+      },
+      "post": {
+        "operationId": "research.publication.create",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "directory",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "idempotency-key",
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 200
+            },
+            "required": true
+          }
+        ],
+        "summary": "Draft an evidence-linked publication with explicit AI-use and contribution statements",
+        "responses": {
+          "200": {
+            "description": "Signed publication draft",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "publication": {
+                      "type": "object",
+                      "properties": {
+                        "schemaVersion": {
+                          "type": "number",
+                          "const": 1
+                        },
+                        "projectId": {
+                          "type": "string"
+                        },
+                        "createdAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                        },
+                        "createdBy": {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": [
+                                "human",
+                                "agent",
+                                "system"
+                              ]
+                            },
+                            "id": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "displayName": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "delegationId": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "id",
+                            "displayName"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "id": {
+                          "type": "string"
+                        },
+                        "title": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500
+                        },
+                        "abstract": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 24000
+                        },
+                        "claimIds": {
+                          "minItems": 1,
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "artifactIds": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "supportState": {
+                          "type": "string",
+                          "enum": [
+                            "approved",
+                            "unresolved"
+                          ]
+                        },
+                        "state": {
+                          "type": "string",
+                          "enum": [
+                            "draft",
+                            "approved"
+                          ]
+                        },
+                        "aiUseStatement": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 12000
+                        },
+                        "contributionStatement": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 12000
+                        },
+                        "approvedAt": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date-time",
+                              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "schemaVersion",
+                        "projectId",
+                        "createdAt",
+                        "createdBy",
+                        "id",
+                        "title",
+                        "abstract",
+                        "claimIds",
+                        "artifactIds",
+                        "supportState",
+                        "state",
+                        "aiUseStatement",
+                        "contributionStatement",
+                        "approvedAt"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "eventId": {
+                      "type": "string"
+                    },
+                    "replayed": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "publication",
+                    "eventId",
+                    "replayed"
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Claims, artifacts, integrity, or idempotency conflict"
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  },
+                  "abstract": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 24000
+                  },
+                  "claimIds": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "artifactIds": {
+                    "default": [],
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "aiUseStatement": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 12000
+                  },
+                  "contributionStatement": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 12000
+                  },
+                  "passphrase": {
+                    "type": "string",
+                    "minLength": 12
+                  },
+                  "humanConfirmed": {
+                    "type": "boolean",
+                    "const": true
+                  }
+                },
+                "required": [
+                  "title",
+                  "abstract",
+                  "claimIds",
+                  "aiUseStatement",
+                  "contributionStatement",
+                  "humanConfirmed"
+                ]
+              }
+            }
+          }
+        },
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpenScienceClient } from \"@synsci/sdk\n\nconst client = createOpenScienceClient()\nawait client.research.publication.create({\n  ...\n})"
+          }
+        ]
+      }
+    },
+    "/research/publications/{publicationId}/approve": {
+      "post": {
+        "operationId": "research.publication.approve",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "directory",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "publicationId",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true
+          },
+          {
+            "in": "header",
+            "name": "idempotency-key",
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 200
+            },
+            "required": true
+          }
+        ],
+        "summary": "Human-approve a publication whose claims have accepted reviews",
+        "responses": {
+          "200": {
+            "description": "Approved publication",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "publication": {
+                      "type": "object",
+                      "properties": {
+                        "schemaVersion": {
+                          "type": "number",
+                          "const": 1
+                        },
+                        "projectId": {
+                          "type": "string"
+                        },
+                        "createdAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                        },
+                        "createdBy": {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": [
+                                "human",
+                                "agent",
+                                "system"
+                              ]
+                            },
+                            "id": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "displayName": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "delegationId": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "id",
+                            "displayName"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "id": {
+                          "type": "string"
+                        },
+                        "title": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500
+                        },
+                        "abstract": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 24000
+                        },
+                        "claimIds": {
+                          "minItems": 1,
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "artifactIds": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "supportState": {
+                          "type": "string",
+                          "enum": [
+                            "approved",
+                            "unresolved"
+                          ]
+                        },
+                        "state": {
+                          "type": "string",
+                          "enum": [
+                            "draft",
+                            "approved"
+                          ]
+                        },
+                        "aiUseStatement": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 12000
+                        },
+                        "contributionStatement": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 12000
+                        },
+                        "approvedAt": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date-time",
+                              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "schemaVersion",
+                        "projectId",
+                        "createdAt",
+                        "createdBy",
+                        "id",
+                        "title",
+                        "abstract",
+                        "claimIds",
+                        "artifactIds",
+                        "supportState",
+                        "state",
+                        "aiUseStatement",
+                        "contributionStatement",
+                        "approvedAt"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "eventId": {
+                      "type": "string"
+                    },
+                    "replayed": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "publication",
+                    "eventId",
+                    "replayed"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "AI and unauthorized roles cannot approve publication"
+          },
+          "409": {
+            "description": "Unresolved claims or idempotency conflict"
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "passphrase": {
+                    "type": "string",
+                    "minLength": 12
+                  },
+                  "humanConfirmed": {
+                    "type": "boolean",
+                    "const": true
+                  }
+                },
+                "required": [
+                  "humanConfirmed"
+                ]
+              }
+            }
+          }
+        },
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpenScienceClient } from \"@synsci/sdk\n\nconst client = createOpenScienceClient()\nawait client.research.publication.approve({\n  ...\n})"
           }
         ]
       }
@@ -12585,6 +14183,43 @@
                             "items": {
                               "type": "string"
                             }
+                          },
+                          "outputs": {
+                            "default": [],
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "path": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "role": {
+                                  "type": "string",
+                                  "enum": [
+                                    "input",
+                                    "output",
+                                    "dataset",
+                                    "model",
+                                    "figure",
+                                    "table",
+                                    "notebook",
+                                    "log",
+                                    "other"
+                                  ]
+                                },
+                                "mediaType": {
+                                  "type": "string",
+                                  "minLength": 1
+                                }
+                              },
+                              "required": [
+                                "path",
+                                "role",
+                                "mediaType"
+                              ],
+                              "additionalProperties": false
+                            }
                           }
                         },
                         "required": [
@@ -13022,6 +14657,43 @@
                               "items": {
                                 "type": "string"
                               }
+                            },
+                            "outputs": {
+                              "default": [],
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "path": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "role": {
+                                    "type": "string",
+                                    "enum": [
+                                      "input",
+                                      "output",
+                                      "dataset",
+                                      "model",
+                                      "figure",
+                                      "table",
+                                      "notebook",
+                                      "log",
+                                      "other"
+                                    ]
+                                  },
+                                  "mediaType": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  }
+                                },
+                                "required": [
+                                  "path",
+                                  "role",
+                                  "mediaType"
+                                ],
+                                "additionalProperties": false
+                              }
                             }
                           },
                           "required": [
@@ -13229,6 +14901,45 @@
                         "items": {
                           "type": "string",
                           "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                        }
+                      },
+                      "outputs": {
+                        "default": [],
+                        "maxItems": 1000,
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "path": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 8000
+                            },
+                            "role": {
+                              "type": "string",
+                              "enum": [
+                                "input",
+                                "output",
+                                "dataset",
+                                "model",
+                                "figure",
+                                "table",
+                                "notebook",
+                                "log",
+                                "other"
+                              ]
+                            },
+                            "mediaType": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 300
+                            }
+                          },
+                          "required": [
+                            "path",
+                            "role",
+                            "mediaType"
+                          ]
                         }
                       }
                     },
@@ -13558,6 +15269,43 @@
                               "type": "array",
                               "items": {
                                 "type": "string"
+                              }
+                            },
+                            "outputs": {
+                              "default": [],
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "path": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "role": {
+                                    "type": "string",
+                                    "enum": [
+                                      "input",
+                                      "output",
+                                      "dataset",
+                                      "model",
+                                      "figure",
+                                      "table",
+                                      "notebook",
+                                      "log",
+                                      "other"
+                                    ]
+                                  },
+                                  "mediaType": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  }
+                                },
+                                "required": [
+                                  "path",
+                                  "role",
+                                  "mediaType"
+                                ],
+                                "additionalProperties": false
                               }
                             }
                           },
@@ -14078,6 +15826,43 @@
                               "items": {
                                 "type": "string"
                               }
+                            },
+                            "outputs": {
+                              "default": [],
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "path": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "role": {
+                                    "type": "string",
+                                    "enum": [
+                                      "input",
+                                      "output",
+                                      "dataset",
+                                      "model",
+                                      "figure",
+                                      "table",
+                                      "notebook",
+                                      "log",
+                                      "other"
+                                    ]
+                                  },
+                                  "mediaType": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  }
+                                },
+                                "required": [
+                                  "path",
+                                  "role",
+                                  "mediaType"
+                                ],
+                                "additionalProperties": false
+                              }
                             }
                           },
                           "required": [
@@ -14212,6 +15997,133 @@
                     },
                     "replayed": {
                       "type": "boolean"
+                    },
+                    "artifacts": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "schemaVersion": {
+                            "type": "number",
+                            "const": 1
+                          },
+                          "projectId": {
+                            "type": "string"
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                          },
+                          "createdBy": {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "human",
+                                  "agent",
+                                  "system"
+                                ]
+                              },
+                              "id": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "displayName": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "delegationId": {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "id",
+                              "displayName"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "id": {
+                            "type": "string"
+                          },
+                          "iterationId": {
+                            "type": "string"
+                          },
+                          "runId": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "path": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "role": {
+                            "type": "string",
+                            "enum": [
+                              "input",
+                              "output",
+                              "dataset",
+                              "model",
+                              "figure",
+                              "table",
+                              "notebook",
+                              "log",
+                              "other"
+                            ]
+                          },
+                          "mediaType": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "byteLength": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "contentHash": {
+                            "type": "string",
+                            "pattern": "^[0-9a-f]{64}$"
+                          },
+                          "captureConfidence": {
+                            "type": "string",
+                            "enum": [
+                              "complete",
+                              "best_effort"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "schemaVersion",
+                          "projectId",
+                          "createdAt",
+                          "createdBy",
+                          "id",
+                          "iterationId",
+                          "runId",
+                          "path",
+                          "role",
+                          "mediaType",
+                          "byteLength",
+                          "contentHash",
+                          "captureConfidence"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "missingOutputs": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
                     }
                   },
                   "required": [
@@ -16353,6 +18265,348 @@
           {
             "lang": "js",
             "source": "import { createOpenScienceClient } from \"@synsci/sdk\n\nconst client = createOpenScienceClient()\nawait client.research.integration.evidence({\n  ...\n})"
+          }
+        ]
+      }
+    },
+    "/research/integrations/code-proposals": {
+      "get": {
+        "operationId": "research.integration.code.list",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "directory",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "summary": "List code merge proposals that have not changed Git or the active foundation",
+        "responses": {
+          "200": {
+            "description": "Code merge proposals",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "schemaVersion": {
+                        "type": "number",
+                        "const": 1
+                      },
+                      "projectId": {
+                        "type": "string"
+                      },
+                      "createdAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                      },
+                      "createdBy": {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "human",
+                              "agent",
+                              "system"
+                            ]
+                          },
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "displayName": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "delegationId": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "id",
+                          "displayName"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "id": {
+                        "type": "string"
+                      },
+                      "evidenceIntegrationId": {
+                        "type": "string"
+                      },
+                      "sourceTrackId": {
+                        "type": "string"
+                      },
+                      "sourceBranch": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "sourceCommit": {
+                        "type": "string",
+                        "pattern": "^[0-9a-f]{40,64}$"
+                      },
+                      "targetBranch": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "targetCommit": {
+                        "type": "string",
+                        "pattern": "^[0-9a-f]{40,64}$"
+                      },
+                      "diffHash": {
+                        "type": "string",
+                        "pattern": "^[0-9a-f]{64}$"
+                      },
+                      "state": {
+                        "type": "string",
+                        "const": "proposed"
+                      },
+                      "instructions": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 8000
+                      }
+                    },
+                    "required": [
+                      "schemaVersion",
+                      "projectId",
+                      "createdAt",
+                      "createdBy",
+                      "id",
+                      "evidenceIntegrationId",
+                      "sourceTrackId",
+                      "sourceBranch",
+                      "sourceCommit",
+                      "targetBranch",
+                      "targetCommit",
+                      "diffHash",
+                      "state",
+                      "instructions"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpenScienceClient } from \"@synsci/sdk\n\nconst client = createOpenScienceClient()\nawait client.research.integration.code.list({\n  ...\n})"
+          }
+        ]
+      },
+      "post": {
+        "operationId": "research.integration.code.propose",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "directory",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "idempotency-key",
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 200
+            },
+            "required": true
+          }
+        ],
+        "summary": "Propose an exact Git diff without merging code or promoting a foundation",
+        "responses": {
+          "200": {
+            "description": "Signed code merge proposal",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "proposal": {
+                      "type": "object",
+                      "properties": {
+                        "schemaVersion": {
+                          "type": "number",
+                          "const": 1
+                        },
+                        "projectId": {
+                          "type": "string"
+                        },
+                        "createdAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                        },
+                        "createdBy": {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": [
+                                "human",
+                                "agent",
+                                "system"
+                              ]
+                            },
+                            "id": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "displayName": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "delegationId": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "id",
+                            "displayName"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "id": {
+                          "type": "string"
+                        },
+                        "evidenceIntegrationId": {
+                          "type": "string"
+                        },
+                        "sourceTrackId": {
+                          "type": "string"
+                        },
+                        "sourceBranch": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "sourceCommit": {
+                          "type": "string",
+                          "pattern": "^[0-9a-f]{40,64}$"
+                        },
+                        "targetBranch": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "targetCommit": {
+                          "type": "string",
+                          "pattern": "^[0-9a-f]{40,64}$"
+                        },
+                        "diffHash": {
+                          "type": "string",
+                          "pattern": "^[0-9a-f]{64}$"
+                        },
+                        "state": {
+                          "type": "string",
+                          "const": "proposed"
+                        },
+                        "instructions": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 8000
+                        }
+                      },
+                      "required": [
+                        "schemaVersion",
+                        "projectId",
+                        "createdAt",
+                        "createdBy",
+                        "id",
+                        "evidenceIntegrationId",
+                        "sourceTrackId",
+                        "sourceBranch",
+                        "sourceCommit",
+                        "targetBranch",
+                        "targetCommit",
+                        "diffHash",
+                        "state",
+                        "instructions"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "eventId": {
+                      "type": "string"
+                    },
+                    "replayed": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "proposal",
+                    "eventId",
+                    "replayed"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an authorized human project member may propose a code merge"
+          },
+          "409": {
+            "description": "Git reference, integrity, or idempotency conflict"
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "evidenceIntegrationId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "sourceCommit": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{40,64}$"
+                  },
+                  "targetBranch": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 300
+                  },
+                  "targetCommit": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{40,64}$"
+                  },
+                  "passphrase": {
+                    "type": "string",
+                    "minLength": 12
+                  },
+                  "humanConfirmed": {
+                    "type": "boolean",
+                    "const": true
+                  }
+                },
+                "required": [
+                  "evidenceIntegrationId",
+                  "sourceCommit",
+                  "targetBranch",
+                  "targetCommit",
+                  "humanConfirmed"
+                ]
+              }
+            }
+          }
+        },
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpenScienceClient } from \"@synsci/sdk\n\nconst client = createOpenScienceClient()\nawait client.research.integration.code.propose({\n  ...\n})"
           }
         ]
       }
@@ -20358,6 +22612,163 @@
           "properties"
         ]
       },
+      "Event.research.integration.updated": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "research.integration.updated"
+          },
+          "properties": {
+            "type": "object",
+            "properties": {
+              "version": {
+                "type": "number",
+                "const": 1
+              },
+              "projectId": {
+                "type": "string"
+              },
+              "subjectType": {
+                "type": "string",
+                "enum": [
+                  "evidence",
+                  "code_proposal"
+                ]
+              },
+              "subjectId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "eventId": {
+                "type": "string"
+              },
+              "action": {
+                "type": "string",
+                "enum": [
+                  "integrated",
+                  "proposed"
+                ]
+              },
+              "replayed": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "version",
+              "projectId",
+              "subjectType",
+              "subjectId",
+              "eventId",
+              "action",
+              "replayed"
+            ]
+          }
+        },
+        "required": [
+          "type",
+          "properties"
+        ]
+      },
+      "Event.research.member.updated": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "research.member.updated"
+          },
+          "properties": {
+            "type": "object",
+            "properties": {
+              "version": {
+                "type": "number",
+                "const": 1
+              },
+              "projectId": {
+                "type": "string"
+              },
+              "memberId": {
+                "type": "string"
+              },
+              "eventId": {
+                "type": "string"
+              },
+              "action": {
+                "type": "string",
+                "enum": [
+                  "added",
+                  "role_changed",
+                  "removed"
+                ]
+              },
+              "replayed": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "version",
+              "projectId",
+              "memberId",
+              "eventId",
+              "action",
+              "replayed"
+            ]
+          }
+        },
+        "required": [
+          "type",
+          "properties"
+        ]
+      },
+      "Event.research.publication.updated": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "research.publication.updated"
+          },
+          "properties": {
+            "type": "object",
+            "properties": {
+              "version": {
+                "type": "number",
+                "const": 1
+              },
+              "projectId": {
+                "type": "string"
+              },
+              "publicationId": {
+                "type": "string"
+              },
+              "eventId": {
+                "type": "string"
+              },
+              "action": {
+                "type": "string",
+                "enum": [
+                  "drafted",
+                  "approved"
+                ]
+              },
+              "replayed": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "version",
+              "projectId",
+              "publicationId",
+              "eventId",
+              "action",
+              "replayed"
+            ]
+          }
+        },
+        "required": [
+          "type",
+          "properties"
+        ]
+      },
       "Event.research.foundation.updated": {
         "type": "object",
         "properties": {
@@ -21178,6 +23589,15 @@
           },
           {
             "$ref": "#/components/schemas/Event.research.evidence.updated"
+          },
+          {
+            "$ref": "#/components/schemas/Event.research.integration.updated"
+          },
+          {
+            "$ref": "#/components/schemas/Event.research.member.updated"
+          },
+          {
+            "$ref": "#/components/schemas/Event.research.publication.updated"
           },
           {
             "$ref": "#/components/schemas/Event.research.foundation.updated"

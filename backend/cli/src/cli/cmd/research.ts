@@ -12,6 +12,10 @@ import { ResearchEnvironmentService } from "../../research/application/environme
 import { ResearchEvidenceService } from "../../research/application/evidence"
 import { ResearchReviewService } from "../../research/application/review"
 import { ResearchFoundationService } from "../../research/application/foundation"
+import { ResearchAdoptionService } from "../../research/application/adopt"
+import { ResearchExportService } from "../../research/application/export"
+import { ResearchIntegrationService } from "../../research/application/integration"
+import { ResearchPublicationService } from "../../research/application/publication"
 import { ProjectMembership } from "../../research/application/membership"
 import { ResearchProject } from "../../research/domain/schema"
 import { readFile } from "node:fs/promises"
@@ -108,6 +112,64 @@ const ResearchVerifyCommand = cmd({
     if (!ledger.readOnly && scientific.valid) return
     process.exitCode = 2
   },
+})
+
+const ResearchAdoptScanCommand = cmd({
+  command: "scan [directory]",
+  describe: "scan an existing Git repository without changing any project file",
+  builder: (yargs) =>
+    yargs
+      .positional("directory", { type: "string", default: process.cwd() })
+      .option("format", { choices: ["text", "json"] as const, default: "text" }),
+  async handler(args) {
+    const report = await ResearchAdoptionService.scan(args.directory as string)
+    output(args.format as Format, report, () => {
+      prompts.log.info(`${report.counts.recognized} recognized · ${report.counts.uncertain} need attestation`)
+      for (const conflict of report.conflicts) prompts.log.warn(conflict)
+      prompts.log.info("No project files were changed. Run research init only after reviewing this report.")
+    })
+  },
+})
+
+const ResearchAdoptCommand = cmd({
+  command: "adopt",
+  describe: "inspect existing research material before explicit initialization",
+  builder: (yargs) => yargs.command(ResearchAdoptScanCommand).demandCommand(),
+  async handler() {},
+})
+
+const ResearchExportCreateCommand = cmd({
+  command: "create [directory]",
+  describe: "create an integrity-verifiable RO-Crate-style research bundle",
+  builder: (yargs) =>
+    yargs
+      .positional("directory", { type: "string", default: process.cwd() })
+      .option("destination", { type: "string", demandOption: true })
+      .option("format", { choices: ["text", "json"] as const, default: "text" }),
+  async handler(args) {
+    const { git } = await current(args.directory as string)
+    const signer = await identity()
+    const member = await ProjectMembership.localMember(git.root, signer.keyId)
+    if (!member) throw new Error("The local signing identity is not an active project member")
+    const result = await ResearchExportService.create({
+      projectRoot: git.root,
+      destination: args.destination as string,
+      actor: { kind: "human", id: member.id, displayName: member.displayName },
+      role: member.role,
+      signer,
+    })
+    output(args.format as Format, result, () => {
+      prompts.log.success(`Created research export at ${result.destination}`)
+      prompts.log.info("MANIFEST.sha256 proves integrity; audit.json states reproducibility limitations.")
+    })
+  },
+})
+
+const ResearchExportCommand = cmd({
+  command: "export",
+  describe: "create honest, independently verifiable research bundles",
+  builder: (yargs) => yargs.command(ResearchExportCreateCommand).demandCommand(),
+  async handler() {},
 })
 
 const ResearchStatusCommand = cmd({
@@ -367,6 +429,12 @@ const ResearchRunDeclareCommand = cmd({
       .option("seed", { type: "number" })
       .option("timeout-ms", { type: "number", default: 60 * 60 * 1000 })
       .option("env", { type: "string", array: true, default: [], describe: "non-secret environment key to pass" })
+      .option("output", {
+        type: "string",
+        array: true,
+        default: [],
+        describe: "project-local output path to hash automatically after execution; repeat as needed",
+      })
       .option("idempotency-key", { type: "string", describe: "reuse this key when retrying the same mutation" })
       .option("format", { choices: ["text", "json"] as const, default: "text" }),
   async handler(args) {
@@ -385,6 +453,11 @@ const ResearchRunDeclareCommand = cmd({
         cwd: git.root,
         timeoutMs: args.timeoutMs as number,
         environmentKeys: args.env as string[],
+        outputs: (args.output as string[]).map((file) => ({
+          path: file,
+          role: "output" as const,
+          mediaType: "application/octet-stream",
+        })),
       },
       actor: { kind: "human", id: member.id, displayName: member.displayName },
       role: member.role,
@@ -764,10 +837,48 @@ const ResearchIntegrateEvidenceCommand = cmd({
   },
 })
 
+const ResearchIntegrateCodeCommand = cmd({
+  command: "code [directory]",
+  describe: "propose an exact Git diff without merging or promoting it",
+  builder: (yargs) =>
+    yargs
+      .positional("directory", { type: "string", default: process.cwd() })
+      .option("evidence-integration", { type: "string", demandOption: true })
+      .option("source-commit", { type: "string", demandOption: true })
+      .option("target-branch", { type: "string", default: "main" })
+      .option("target-commit", { type: "string", demandOption: true })
+      .option("yes", { type: "boolean", default: false })
+      .option("idempotency-key", { type: "string", describe: "reuse this key when retrying the same mutation" })
+      .option("format", { choices: ["text", "json"] as const, default: "text" }),
+  async handler(args) {
+    if (!args.yes) throw new Error("Code proposal requires --yes after reviewing the exact source and target commits")
+    const { git } = await current(args.directory as string)
+    const signer = await identity()
+    const member = await ProjectMembership.localMember(git.root, signer.keyId)
+    if (!member) throw new Error("The local signing identity is not an active project member")
+    const result = await ResearchIntegrationService.proposeCodeMerge({
+      projectRoot: git.root,
+      evidenceIntegrationId: args.evidenceIntegration as string,
+      sourceCommit: args.sourceCommit as string,
+      targetBranch: args.targetBranch as string,
+      targetCommit: args.targetCommit as string,
+      actor: { kind: "human", id: member.id, displayName: member.displayName },
+      role: member.role,
+      signer,
+      idempotencyKey: (args.idempotencyKey as string | undefined) ?? crypto.randomUUID(),
+    })
+    output(args.format as Format, result, () => {
+      prompts.log.success(`Recorded code proposal ${result.proposal.id}`)
+      prompts.log.info("No Git merge occurred and the active foundation is unchanged.")
+    })
+  },
+})
+
 const ResearchIntegrateCommand = cmd({
   command: "integrate",
   describe: "separate evidence integration from code and foundation decisions",
-  builder: (yargs) => yargs.command(ResearchIntegrateEvidenceCommand).demandCommand(),
+  builder: (yargs) =>
+    yargs.command(ResearchIntegrateEvidenceCommand).command(ResearchIntegrateCodeCommand).demandCommand(),
   async handler() {},
 })
 
@@ -839,6 +950,229 @@ const ResearchFoundationCommand = cmd({
   async handler() {},
 })
 
+const ResearchMemberListCommand = cmd({
+  command: "list [directory]",
+  describe: "list project members and roles",
+  builder: (yargs) =>
+    yargs
+      .positional("directory", { type: "string", default: process.cwd() })
+      .option("format", { choices: ["text", "json"] as const, default: "text" }),
+  async handler(args) {
+    const { git } = await current(args.directory as string)
+    const members = await ProjectMembership.list(git.root)
+    output(args.format as Format, members, () => {
+      for (const member of members)
+        prompts.log.info(`${member.active ? "active" : "inactive"} · ${member.role} · ${member.displayName}`)
+    })
+  },
+})
+
+const ResearchMemberAddCommand = cmd({
+  command: "add [directory]",
+  describe: "add a project member by signing-key fingerprint",
+  builder: (yargs) =>
+    yargs
+      .positional("directory", { type: "string", default: process.cwd() })
+      .option("name", { type: "string", demandOption: true })
+      .option("email", { type: "string" })
+      .option("member-role", { choices: ["owner", "researcher", "reviewer", "viewer"] as const, demandOption: true })
+      .option("signing-key", { type: "string", demandOption: true })
+      .option("yes", { type: "boolean", default: false })
+      .option("idempotency-key", { type: "string" })
+      .option("format", { choices: ["text", "json"] as const, default: "text" }),
+  async handler(args) {
+    if (!args.yes) throw new Error("Adding a project member requires --yes")
+    const { git } = await current(args.directory as string)
+    const signer = await identity()
+    const owner = await ProjectMembership.localMember(git.root, signer.keyId)
+    if (!owner) throw new Error("The local signing identity is not an active project member")
+    const result = await ProjectMembership.add({
+      projectRoot: git.root,
+      displayName: args.name as string,
+      email: args.email as string | undefined,
+      memberRole: args.memberRole as "owner" | "researcher" | "reviewer" | "viewer",
+      signingKeyId: args.signingKey as string,
+      actor: { kind: "human", id: owner.id, displayName: owner.displayName },
+      role: owner.role,
+      signer,
+      idempotencyKey: (args.idempotencyKey as string | undefined) ?? crypto.randomUUID(),
+    })
+    output(args.format as Format, result, () =>
+      prompts.log.success(`Added ${result.member.displayName} as ${result.member.role}`),
+    )
+  },
+})
+
+const ResearchMemberRoleCommand = cmd({
+  command: "role <member-id> [directory]",
+  describe: "change a member role without rewriting history",
+  builder: (yargs) =>
+    yargs
+      .positional("member-id", { type: "string", demandOption: true })
+      .positional("directory", { type: "string", default: process.cwd() })
+      .option("new-role", { choices: ["owner", "researcher", "reviewer", "viewer"] as const, demandOption: true })
+      .option("yes", { type: "boolean", default: false })
+      .option("idempotency-key", { type: "string" })
+      .option("format", { choices: ["text", "json"] as const, default: "text" }),
+  async handler(args) {
+    if (!args.yes) throw new Error("Changing a project role requires --yes")
+    const { git } = await current(args.directory as string)
+    const signer = await identity()
+    const owner = await ProjectMembership.localMember(git.root, signer.keyId)
+    if (!owner) throw new Error("The local signing identity is not an active project member")
+    const result = await ProjectMembership.changeRole({
+      projectRoot: git.root,
+      memberId: args.memberId as string,
+      newRole: args.newRole as "owner" | "researcher" | "reviewer" | "viewer",
+      actor: { kind: "human", id: owner.id, displayName: owner.displayName },
+      role: owner.role,
+      signer,
+      idempotencyKey: (args.idempotencyKey as string | undefined) ?? crypto.randomUUID(),
+    })
+    output(args.format as Format, result, () =>
+      prompts.log.success(`${result.member.displayName} is now ${result.member.role}`),
+    )
+  },
+})
+
+const ResearchMemberRemoveCommand = cmd({
+  command: "remove <member-id> [directory]",
+  describe: "remove a member prospectively while preserving attribution",
+  builder: (yargs) =>
+    yargs
+      .positional("member-id", { type: "string", demandOption: true })
+      .positional("directory", { type: "string", default: process.cwd() })
+      .option("yes", { type: "boolean", default: false })
+      .option("idempotency-key", { type: "string" })
+      .option("format", { choices: ["text", "json"] as const, default: "text" }),
+  async handler(args) {
+    if (!args.yes) throw new Error("Removing a project member requires --yes")
+    const { git } = await current(args.directory as string)
+    const signer = await identity()
+    const owner = await ProjectMembership.localMember(git.root, signer.keyId)
+    if (!owner) throw new Error("The local signing identity is not an active project member")
+    const result = await ProjectMembership.remove({
+      projectRoot: git.root,
+      memberId: args.memberId as string,
+      actor: { kind: "human", id: owner.id, displayName: owner.displayName },
+      role: owner.role,
+      signer,
+      idempotencyKey: (args.idempotencyKey as string | undefined) ?? crypto.randomUUID(),
+    })
+    output(args.format as Format, result, () =>
+      prompts.log.success(`Removed ${result.member.displayName} prospectively`),
+    )
+  },
+})
+
+const ResearchMemberCommand = cmd({
+  command: "member",
+  describe: "manage signed project membership and roles",
+  builder: (yargs) =>
+    yargs
+      .command(ResearchMemberListCommand)
+      .command(ResearchMemberAddCommand)
+      .command(ResearchMemberRoleCommand)
+      .command(ResearchMemberRemoveCommand)
+      .demandCommand(),
+  async handler() {},
+})
+
+const ResearchPublicationListCommand = cmd({
+  command: "list [directory]",
+  describe: "list evidence-linked publication records",
+  builder: (yargs) =>
+    yargs
+      .positional("directory", { type: "string", default: process.cwd() })
+      .option("format", { choices: ["text", "json"] as const, default: "text" }),
+  async handler(args) {
+    const { git } = await current(args.directory as string)
+    const publications = await ResearchPublicationService.list(git.root)
+    output(args.format as Format, publications, () => {
+      for (const publication of publications)
+        prompts.log.info(`${publication.state} · ${publication.supportState} · ${publication.title}`)
+    })
+  },
+})
+
+const ResearchPublicationCreateCommand = cmd({
+  command: "create [directory]",
+  describe: "draft an evidence-linked publication",
+  builder: (yargs) =>
+    yargs
+      .positional("directory", { type: "string", default: process.cwd() })
+      .option("title", { type: "string", demandOption: true })
+      .option("abstract", { type: "string", demandOption: true })
+      .option("claim", { type: "string", array: true, demandOption: true })
+      .option("artifact", { type: "string", array: true, default: [] })
+      .option("ai-use", { type: "string", demandOption: true })
+      .option("contributions", { type: "string", demandOption: true })
+      .option("idempotency-key", { type: "string" })
+      .option("format", { choices: ["text", "json"] as const, default: "text" }),
+  async handler(args) {
+    const { git } = await current(args.directory as string)
+    const signer = await identity()
+    const member = await ProjectMembership.localMember(git.root, signer.keyId)
+    if (!member) throw new Error("The local signing identity is not an active project member")
+    const result = await ResearchPublicationService.create({
+      projectRoot: git.root,
+      title: args.title as string,
+      abstract: args.abstract as string,
+      claimIds: args.claim as string[],
+      artifactIds: args.artifact as string[],
+      aiUseStatement: args.aiUse as string,
+      contributionStatement: args.contributions as string,
+      actor: { kind: "human", id: member.id, displayName: member.displayName },
+      role: member.role,
+      signer,
+      idempotencyKey: (args.idempotencyKey as string | undefined) ?? crypto.randomUUID(),
+    })
+    output(args.format as Format, result, () =>
+      prompts.log.success(`Drafted ${result.publication.title} (${result.publication.supportState})`),
+    )
+  },
+})
+
+const ResearchPublicationApproveCommand = cmd({
+  command: "approve <publication-id> [directory]",
+  describe: "approve a publication only when all claims have accepted reviews",
+  builder: (yargs) =>
+    yargs
+      .positional("publication-id", { type: "string", demandOption: true })
+      .positional("directory", { type: "string", default: process.cwd() })
+      .option("yes", { type: "boolean", default: false })
+      .option("idempotency-key", { type: "string" })
+      .option("format", { choices: ["text", "json"] as const, default: "text" }),
+  async handler(args) {
+    if (!args.yes) throw new Error("Publication approval requires --yes after human review")
+    const { git } = await current(args.directory as string)
+    const signer = await identity()
+    const member = await ProjectMembership.localMember(git.root, signer.keyId)
+    if (!member) throw new Error("The local signing identity is not an active project member")
+    const result = await ResearchPublicationService.approve({
+      projectRoot: git.root,
+      publicationId: args.publicationId as string,
+      actor: { kind: "human", id: member.id, displayName: member.displayName },
+      role: member.role,
+      signer,
+      idempotencyKey: (args.idempotencyKey as string | undefined) ?? crypto.randomUUID(),
+    })
+    output(args.format as Format, result, () => prompts.log.success(`Approved ${result.publication.title}`))
+  },
+})
+
+const ResearchPublicationCommand = cmd({
+  command: "publication",
+  describe: "draft and approve evidence-linked publications",
+  builder: (yargs) =>
+    yargs
+      .command(ResearchPublicationListCommand)
+      .command(ResearchPublicationCreateCommand)
+      .command(ResearchPublicationApproveCommand)
+      .demandCommand(),
+  async handler() {},
+})
+
 export const ResearchCommand = cmd({
   command: "research",
   describe: "manage the local, reproducible scientific workflow",
@@ -846,6 +1180,8 @@ export const ResearchCommand = cmd({
     yargs
       .command(ResearchInitCommand)
       .command(ResearchVerifyCommand)
+      .command(ResearchAdoptCommand)
+      .command(ResearchExportCommand)
       .command(ResearchStatusCommand)
       .command(ResearchTrackCommand)
       .command(ResearchProtocolCommand)
@@ -857,6 +1193,8 @@ export const ResearchCommand = cmd({
       .command(ResearchReviewCommand)
       .command(ResearchIntegrateCommand)
       .command(ResearchFoundationCommand)
+      .command(ResearchMemberCommand)
+      .command(ResearchPublicationCommand)
       .demandCommand(),
   async handler() {},
 })

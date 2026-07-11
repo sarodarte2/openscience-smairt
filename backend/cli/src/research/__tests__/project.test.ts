@@ -272,17 +272,36 @@ describe("Research project initialization", () => {
         parameters: { learningRate: 0.0001 },
         seed: 42,
         execution: {
-          command: "/usr/bin/printf",
-          args: ["formal-output"],
+          command: "/usr/bin/touch",
+          args: ["formal-output.txt"],
           cwd: root,
           timeoutMs: 60_000,
           environmentKeys: [],
+          outputs: [{ path: "formal-output.txt", role: "output", mediaType: "text/plain" }],
         },
         actor,
         role: "researcher",
         signer,
         idempotencyKey: "run-initial-feasibility-42",
       })
+      const projection = path.join(root, `.openscience/research/projections/runs/${declared.run.id}.json`)
+      await writeFile(
+        projection,
+        JSON.stringify({
+          ...declared.run,
+          execution: { ...declared.run.execution, command: "/usr/bin/false", args: [] },
+        }) + "\n",
+      )
+      await expect(
+        ResearchRunService.execute({
+          projectRoot: root,
+          runId: declared.run.id,
+          actor,
+          role: "researcher",
+          signer,
+        }),
+      ).rejects.toThrow("does not match its signed intent")
+      await writeFile(projection, JSON.stringify(declared.run) + "\n")
       const drift = path.join(root, "uncommitted-drift.txt")
       await writeFile(drift, "changed after declaration\n")
       await expect(
@@ -315,7 +334,7 @@ describe("Research project initialization", () => {
     expect(declared.run).toMatchObject({ state: "declared", seed: 42, protocolId: frozen.protocol.id })
     expect(declared.run.execution).toMatchObject({
       command: "conda",
-      args: ["run", "--no-capture-output", "--name", isolated.environment.name, "/usr/bin/printf", "formal-output"],
+      args: ["run", "--no-capture-output", "--name", isolated.environment.name, "/usr/bin/touch", "formal-output.txt"],
     })
     expect(declared.run.workspace.captureConfidence).toBe("best_effort")
     expect(declared.run.environment.captureConfidence).toBe("credential_redacted")
@@ -330,11 +349,12 @@ describe("Research project initialization", () => {
       parameters: { learningRate: 0.0001 },
       seed: 42,
       execution: {
-        command: "/usr/bin/printf",
-        args: ["formal-output"],
+        command: "/usr/bin/touch",
+        args: ["formal-output.txt"],
         cwd: root,
         timeoutMs: 60_000,
         environmentKeys: [],
+        outputs: [{ path: "formal-output.txt", role: "output", mediaType: "text/plain" }],
       },
       actor,
       role: "researcher",
@@ -345,15 +365,18 @@ describe("Research project initialization", () => {
     expect(await ResearchRunService.list(root, investigation.iteration.id)).toMatchObject([
       { id: declared.run.id, state: "succeeded" },
     ])
-    expect(completed).toMatchObject({ run: { state: "succeeded", result: { outcome: "succeeded" } }, replayed: false })
+    expect(completed).toMatchObject({
+      run: { state: "succeeded", result: { outcome: "succeeded" } },
+      artifacts: [{ runId: declared.run.id, path: "formal-output.txt", role: "output" }],
+      missingOutputs: [],
+      replayed: false,
+    })
     expect(replayedExecution).toMatchObject({
       run: { id: declared.run.id, state: "succeeded" },
       eventId: completed.eventId,
       replayed: true,
     })
-    expect(await readFile(path.join(root, `.openscience/research/runs/${declared.run.id}/stdout.log`), "utf8")).toBe(
-      "formal-output",
-    )
+    expect(await readFile(path.join(root, `.openscience/research/runs/${declared.run.id}/stdout.log`), "utf8")).toBe("")
     const notebookPath = path.join(root, "analysis.ipynb")
     await writeFile(
       notebookPath,
@@ -403,7 +426,7 @@ describe("Research project initialization", () => {
     expect(await readFile(path.join(root, notebookCompleted.run.notebook!.executedPath), "utf8")).toBe(
       await readFile(notebookPath, "utf8"),
     )
-    expect((await FilesystemLedger.inspect(root)).events).toHaveLength(12)
+    expect((await FilesystemLedger.inspect(root)).events).toHaveLength(13)
     expect((await ResearchAudit.inspect(root)).readOnly).toBeFalse()
 
     const attacker = Ed25519.generate().signer
@@ -434,6 +457,7 @@ describe("Research project initialization", () => {
     const member = ProjectMember.parse({
       schemaVersion: 1,
       id: ResearchID.create("member"),
+      actorId: memberActor.id,
       projectId: project.project.id,
       displayName: memberActor.displayName,
       role: "researcher",

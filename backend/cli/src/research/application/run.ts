@@ -8,6 +8,7 @@ import { CondaEnvironment } from "../adapters/environment/conda"
 import { Canonical, type JsonValue } from "../domain/canonical"
 import { Governance, ResearchCapability, type ResearchRole } from "../domain/governance"
 import {
+  ArtifactManifest,
   Json,
   ProtocolRevision,
   ResearchIteration,
@@ -20,6 +21,7 @@ import { ResearchID } from "../domain/id"
 import type { Signer } from "../domain/signature"
 import { ResearchAudit } from "./audit"
 import type { ResearchEvent } from "../domain/event"
+import { ResearchEvidenceService } from "./evidence"
 
 export class RunStateError extends Error {
   constructor(
@@ -147,6 +149,7 @@ export namespace ResearchRunService {
       cwd: string
       timeoutMs: number
       environmentKeys: string[]
+      outputs?: { path: string; role: ArtifactManifest["role"]; mediaType: string }[]
       notebook?: { sourcePath: string; allowErrors: boolean }
     }
     actor: Actor
@@ -181,6 +184,7 @@ export namespace ResearchRunService {
         cwd,
         timeoutMs: input.execution.timeoutMs,
         environmentKeys: input.execution.environmentKeys,
+        outputs: input.execution.outputs ?? [],
         notebook: notebook
           ? {
               sourcePath: notebook.relative,
@@ -300,6 +304,7 @@ export namespace ResearchRunService {
           cwd,
           timeoutMs: input.execution.timeoutMs,
           environmentKeys: input.execution.environmentKeys,
+          outputs: input.execution.outputs ?? [],
         },
         state: "declared",
         createdAt: now,
@@ -426,7 +431,17 @@ export namespace ResearchRunService {
       if (declared.projectId !== project.id) throw new Error("Run belongs to a different research project")
       const completedEvent = recordedRun(audit.events, "run.completed", declared.id)
       if (completedEvent) {
+        if (Canonical.hash(completedEvent.run as JsonValue) !== Canonical.hash(declared as JsonValue)) {
+          throw new RunStateError(declared.id, `Run ${declared.id} does not match its signed completion`)
+        }
         return materialize(git.root, { ...completedEvent, replayed: true })
+      }
+      const intent = recordedRun(audit.events, "run.intent_declared", declared.id)
+      if (!intent || Canonical.hash(intent.run as JsonValue) !== Canonical.hash(declared as JsonValue)) {
+        throw new RunStateError(declared.id, `Run ${declared.id} does not match its signed intent`)
+      }
+      if (declared.intentEventId !== intent.eventId) {
+        throw new RunStateError(declared.id, `Run ${declared.id} references the wrong signed intent`)
       }
       if (["succeeded", "failed", "timed_out", "cancelled", "lost"].includes(declared.state)) {
         throw new RunStateError(
@@ -543,7 +558,31 @@ export namespace ResearchRunService {
             eventId: completion.event.eventId,
             replayed: false,
           }
-      return materialize(git.root, value)
+      const projected = await materialize(git.root, value)
+      const artifacts = []
+      const missingOutputs = []
+      for (const [index, output] of projected.run.execution.outputs.entries()) {
+        const file = path.resolve(projected.run.execution.cwd, output.path)
+        if (!(await Bun.file(file).exists())) {
+          missingOutputs.push(output.path)
+          continue
+        }
+        const registered = await ResearchEvidenceService.registerArtifact({
+          projectRoot: git.root,
+          iterationId: projected.run.iterationId,
+          file,
+          artifactRole: output.role,
+          mediaType: output.mediaType,
+          runId: projected.run.id,
+          actor: input.actor,
+          role: input.role,
+          delegatedCapabilities: input.delegatedCapabilities,
+          signer: input.signer,
+          idempotencyKey: `internal:run-output:${projected.run.id}:${index}`,
+        })
+        artifacts.push(registered.artifact)
+      }
+      return { ...projected, artifacts, missingOutputs }
     }
     return FilesystemLedger.withIdempotencyLock({
       projectRoot: git.root,

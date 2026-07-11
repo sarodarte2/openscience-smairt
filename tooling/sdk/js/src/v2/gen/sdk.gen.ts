@@ -116,6 +116,7 @@ import type {
   QuestionRejectResponses,
   QuestionReplyErrors,
   QuestionReplyResponses,
+  ResearchAdoptionScanResponses,
   ResearchAnalysisCreateResponses,
   ResearchAnalysisListResponses,
   ResearchArtifactListResponses,
@@ -126,21 +127,38 @@ import type {
   ResearchEnvironmentIsolateErrors,
   ResearchEnvironmentIsolateResponses,
   ResearchEnvironmentListResponses,
+  ResearchExportCreateErrors,
+  ResearchExportCreateResponses,
   ResearchFoundationListResponses,
   ResearchFoundationPreviewResponses,
   ResearchFoundationPromoteErrors,
   ResearchFoundationPromoteResponses,
   ResearchInitializeErrors,
   ResearchInitializeResponses,
+  ResearchIntegrationCodeListResponses,
+  ResearchIntegrationCodeProposeErrors,
+  ResearchIntegrationCodeProposeResponses,
   ResearchIntegrationEvidenceResponses,
   ResearchIntegrationListResponses,
   ResearchIterationCreateErrors,
   ResearchIterationCreateResponses,
   ResearchIterationListResponses,
   ResearchLedgerResponses,
+  ResearchMemberAddErrors,
+  ResearchMemberAddResponses,
+  ResearchMemberListResponses,
+  ResearchMemberRemoveErrors,
+  ResearchMemberRemoveResponses,
+  ResearchMemberRoleErrors,
+  ResearchMemberRoleResponses,
   ResearchProtocolFreezeErrors,
   ResearchProtocolFreezeResponses,
   ResearchProtocolListResponses,
+  ResearchPublicationApproveErrors,
+  ResearchPublicationApproveResponses,
+  ResearchPublicationCreateErrors,
+  ResearchPublicationCreateResponses,
+  ResearchPublicationListResponses,
   ResearchReviewCreateResponses,
   ResearchReviewListResponses,
   ResearchRunDeclareErrors,
@@ -3684,6 +3702,331 @@ export class Mcp extends HeyApiClient {
   }
 }
 
+export class Adoption extends HeyApiClient {
+  /**
+   * Scan an existing repository without changing it
+   */
+  public scan<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams([parameters], [{ args: [{ in: "query", key: "directory" }] }])
+    return (options?.client ?? this.client).get<ResearchAdoptionScanResponses, unknown, ThrowOnError>({
+      url: "/research/adoption",
+      ...options,
+      ...params,
+    })
+  }
+}
+
+export class Export extends HeyApiClient {
+  /**
+   * Create an integrity-verifiable RO-Crate-style research export
+   */
+  public create<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      destination?: string
+      passphrase?: string
+      humanConfirmed?: true
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "body", key: "destination" },
+            { in: "body", key: "passphrase" },
+            { in: "body", key: "humanConfirmed" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      ResearchExportCreateResponses,
+      ResearchExportCreateErrors,
+      ThrowOnError
+    >({
+      url: "/research/exports",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+}
+
+export class Member extends HeyApiClient {
+  /**
+   * List project members and roles
+   */
+  public list<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams([parameters], [{ args: [{ in: "query", key: "directory" }] }])
+    return (options?.client ?? this.client).get<ResearchMemberListResponses, unknown, ThrowOnError>({
+      url: "/research/members",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Add a project member by signing-key fingerprint
+   */
+  public add<ThrowOnError extends boolean = false>(
+    parameters: {
+      "idempotency-key": string
+      directory?: string
+      displayName?: string
+      email?: string
+      memberRole?: "owner" | "researcher" | "reviewer" | "viewer"
+      signingKeyId?: string
+      passphrase?: string
+      humanConfirmed?: true
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "headers", key: "idempotency-key" },
+            { in: "query", key: "directory" },
+            { in: "body", key: "displayName" },
+            { in: "body", key: "email" },
+            { in: "body", key: "memberRole" },
+            { in: "body", key: "signingKeyId" },
+            { in: "body", key: "passphrase" },
+            { in: "body", key: "humanConfirmed" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<ResearchMemberAddResponses, ResearchMemberAddErrors, ThrowOnError>({
+      url: "/research/members",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Change a member role without rewriting attribution history
+   */
+  public role<ThrowOnError extends boolean = false>(
+    parameters: {
+      "idempotency-key": string
+      memberId: string
+      directory?: string
+      newRole?: "owner" | "researcher" | "reviewer" | "viewer"
+      passphrase?: string
+      humanConfirmed?: true
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "headers", key: "idempotency-key" },
+            { in: "path", key: "memberId" },
+            { in: "query", key: "directory" },
+            { in: "body", key: "newRole" },
+            { in: "body", key: "passphrase" },
+            { in: "body", key: "humanConfirmed" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).patch<ResearchMemberRoleResponses, ResearchMemberRoleErrors, ThrowOnError>({
+      url: "/research/members/{memberId}/role",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Remove a member prospectively while preserving historical attribution
+   */
+  public remove<ThrowOnError extends boolean = false>(
+    parameters: {
+      "idempotency-key": string
+      memberId: string
+      directory?: string
+      passphrase?: string
+      humanConfirmed?: true
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "headers", key: "idempotency-key" },
+            { in: "path", key: "memberId" },
+            { in: "query", key: "directory" },
+            { in: "body", key: "passphrase" },
+            { in: "body", key: "humanConfirmed" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).delete<
+      ResearchMemberRemoveResponses,
+      ResearchMemberRemoveErrors,
+      ThrowOnError
+    >({
+      url: "/research/members/{memberId}",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+}
+
+export class Publication extends HeyApiClient {
+  /**
+   * List evidence-linked publication records
+   */
+  public list<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams([parameters], [{ args: [{ in: "query", key: "directory" }] }])
+    return (options?.client ?? this.client).get<ResearchPublicationListResponses, unknown, ThrowOnError>({
+      url: "/research/publications",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Draft an evidence-linked publication with explicit AI-use and contribution statements
+   */
+  public create<ThrowOnError extends boolean = false>(
+    parameters: {
+      "idempotency-key": string
+      directory?: string
+      title?: string
+      abstract?: string
+      claimIds?: Array<string>
+      artifactIds?: Array<string>
+      aiUseStatement?: string
+      contributionStatement?: string
+      passphrase?: string
+      humanConfirmed?: true
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "headers", key: "idempotency-key" },
+            { in: "query", key: "directory" },
+            { in: "body", key: "title" },
+            { in: "body", key: "abstract" },
+            { in: "body", key: "claimIds" },
+            { in: "body", key: "artifactIds" },
+            { in: "body", key: "aiUseStatement" },
+            { in: "body", key: "contributionStatement" },
+            { in: "body", key: "passphrase" },
+            { in: "body", key: "humanConfirmed" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      ResearchPublicationCreateResponses,
+      ResearchPublicationCreateErrors,
+      ThrowOnError
+    >({
+      url: "/research/publications",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Human-approve a publication whose claims have accepted reviews
+   */
+  public approve<ThrowOnError extends boolean = false>(
+    parameters: {
+      "idempotency-key": string
+      publicationId: string
+      directory?: string
+      passphrase?: string
+      humanConfirmed?: true
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "headers", key: "idempotency-key" },
+            { in: "path", key: "publicationId" },
+            { in: "query", key: "directory" },
+            { in: "body", key: "passphrase" },
+            { in: "body", key: "humanConfirmed" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      ResearchPublicationApproveResponses,
+      ResearchPublicationApproveErrors,
+      ThrowOnError
+    >({
+      url: "/research/publications/{publicationId}/approve",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+}
+
 export class Track extends HeyApiClient {
   /**
    * List stable scientific tracks
@@ -4115,6 +4458,11 @@ export class Run extends HeyApiClient {
         cwd?: string
         timeoutMs?: number
         environmentKeys?: Array<string>
+        outputs?: Array<{
+          path: string
+          role: "input" | "output" | "dataset" | "model" | "figure" | "table" | "notebook" | "log" | "other"
+          mediaType: string
+        }>
       }
       passphrase?: string
       humanConfirmed?: true
@@ -4513,6 +4861,74 @@ export class Review extends HeyApiClient {
   }
 }
 
+export class Code extends HeyApiClient {
+  /**
+   * List code merge proposals that have not changed Git or the active foundation
+   */
+  public list<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams([parameters], [{ args: [{ in: "query", key: "directory" }] }])
+    return (options?.client ?? this.client).get<ResearchIntegrationCodeListResponses, unknown, ThrowOnError>({
+      url: "/research/integrations/code-proposals",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Propose an exact Git diff without merging code or promoting a foundation
+   */
+  public propose<ThrowOnError extends boolean = false>(
+    parameters: {
+      "idempotency-key": string
+      directory?: string
+      evidenceIntegrationId?: string
+      sourceCommit?: string
+      targetBranch?: string
+      targetCommit?: string
+      passphrase?: string
+      humanConfirmed?: true
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "headers", key: "idempotency-key" },
+            { in: "query", key: "directory" },
+            { in: "body", key: "evidenceIntegrationId" },
+            { in: "body", key: "sourceCommit" },
+            { in: "body", key: "targetBranch" },
+            { in: "body", key: "targetCommit" },
+            { in: "body", key: "passphrase" },
+            { in: "body", key: "humanConfirmed" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      ResearchIntegrationCodeProposeResponses,
+      ResearchIntegrationCodeProposeErrors,
+      ThrowOnError
+    >({
+      url: "/research/integrations/code-proposals",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+}
+
 export class Integration extends HeyApiClient {
   /**
    * List evidence-only integrations
@@ -4579,6 +4995,11 @@ export class Integration extends HeyApiClient {
         ...params.headers,
       },
     })
+  }
+
+  private _code?: Code
+  get code(): Code {
+    return (this._code ??= new Code({ client: this.client }))
   }
 }
 
@@ -4760,6 +5181,26 @@ export class Research extends HeyApiClient {
         ...params.headers,
       },
     })
+  }
+
+  private _adoption?: Adoption
+  get adoption(): Adoption {
+    return (this._adoption ??= new Adoption({ client: this.client }))
+  }
+
+  private _export?: Export
+  get export(): Export {
+    return (this._export ??= new Export({ client: this.client }))
+  }
+
+  private _member?: Member
+  get member(): Member {
+    return (this._member ??= new Member({ client: this.client }))
+  }
+
+  private _publication?: Publication
+  get publication(): Publication {
+    return (this._publication ??= new Publication({ client: this.client }))
   }
 
   private _track?: Track

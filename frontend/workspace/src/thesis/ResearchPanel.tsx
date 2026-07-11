@@ -16,6 +16,7 @@ import {
 } from "@/thesis/EnvironmentIsolation"
 import { EvidencePanel } from "@/thesis/EvidencePanel"
 import { DecisionPanel } from "@/thesis/DecisionPanel"
+import { TrustPanel } from "@/thesis/TrustPanel"
 
 interface ResearchProject {
   id: string
@@ -567,6 +568,7 @@ export function ResearchPanel(): JSX.Element {
               tracks={(tracks() ?? []).map((item) => ({ id: item.id, title: item.title, hidden: item.hidden }))}
               disabled={status()?.readOnly}
             />
+            <TrustPanel disabled={status()?.readOnly} />
           </Match>
         </Switch>
       </main>

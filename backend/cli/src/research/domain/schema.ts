@@ -171,6 +171,18 @@ export const NotebookRun = z
   .strict()
 export type NotebookRun = z.infer<typeof NotebookRun>
 
+export const ArtifactRole = z.enum([
+  "input",
+  "output",
+  "dataset",
+  "model",
+  "figure",
+  "table",
+  "notebook",
+  "log",
+  "other",
+])
+
 export const RunAttempt = RecordBase.extend({
   id: ResearchID.schema("run"),
   iterationId: ResearchID.schema("iteration"),
@@ -191,6 +203,17 @@ export const RunAttempt = RecordBase.extend({
       cwd: z.string().min(1),
       timeoutMs: z.number().int().positive(),
       environmentKeys: z.array(z.string()),
+      outputs: z
+        .array(
+          z
+            .object({
+              path: z.string().min(1),
+              role: ArtifactRole,
+              mediaType: z.string().min(1),
+            })
+            .strict(),
+        )
+        .default([]),
     })
     .strict(),
   state: z.enum(["declared", "queued", "running", "succeeded", "failed", "timed_out", "cancelled", "lost"]),
@@ -218,7 +241,7 @@ export const ArtifactManifest = RecordBase.extend({
   iterationId: ResearchID.schema("iteration"),
   runId: ResearchID.schema("run").nullable(),
   path: z.string().min(1),
-  role: z.enum(["input", "output", "dataset", "model", "figure", "table", "notebook", "log", "other"]),
+  role: ArtifactRole,
   mediaType: z.string().min(1),
   byteLength: z.number().int().nonnegative(),
   contentHash: Hash,
@@ -284,6 +307,34 @@ export const EvidenceIntegration = RecordBase.extend({
 }).strict()
 export type EvidenceIntegration = z.infer<typeof EvidenceIntegration>
 
+export const CodeMergeProposal = RecordBase.extend({
+  id: ResearchID.schema("codeProposal"),
+  evidenceIntegrationId: ResearchID.schema("integration"),
+  sourceTrackId: ResearchID.schema("track"),
+  sourceBranch: z.string().min(1),
+  sourceCommit: z.string().regex(/^[0-9a-f]{40,64}$/),
+  targetBranch: z.string().min(1),
+  targetCommit: z.string().regex(/^[0-9a-f]{40,64}$/),
+  diffHash: Hash,
+  state: z.literal("proposed"),
+  instructions: z.string().min(1).max(8000),
+}).strict()
+export type CodeMergeProposal = z.infer<typeof CodeMergeProposal>
+
+export const ResearchPublication = RecordBase.extend({
+  id: ResearchID.schema("publication"),
+  title: z.string().min(1).max(500),
+  abstract: z.string().min(1).max(24000),
+  claimIds: z.array(ResearchID.schema("claim")).min(1),
+  artifactIds: z.array(ResearchID.schema("artifact")),
+  supportState: z.enum(["approved", "unresolved"]),
+  state: z.enum(["draft", "approved"]),
+  aiUseStatement: z.string().min(1).max(12000),
+  contributionStatement: z.string().min(1).max(12000),
+  approvedAt: Timestamp.nullable(),
+}).strict()
+export type ResearchPublication = z.infer<typeof ResearchPublication>
+
 export const WorkspaceBinding = RecordBase.extend({
   id: ResearchID.schema("workspace"),
   trackId: ResearchID.schema("track"),
@@ -313,6 +364,7 @@ export const MemberRole = z.enum(["owner", "researcher", "reviewer", "viewer"])
 
 export const ProjectMember = RecordBase.extend({
   id: ResearchID.schema("member"),
+  actorId: z.string().min(1).optional(),
   displayName: z.string().min(1).max(200),
   email: z.string().email().optional(),
   gitName: z.string().min(1).optional(),

@@ -110,6 +110,7 @@ export namespace ResearchProjectService {
     const member = ProjectMember.parse({
       schemaVersion: 1,
       id: memberId,
+      actorId: input.actor.id,
       projectId,
       displayName: input.actor.displayName,
       email: git.user.email ?? undefined,

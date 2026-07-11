@@ -15,8 +15,11 @@ export const ResearchCapability = {
   claimFinalize: "claim.finalize",
   trackReview: "track.review",
   evidenceIntegrate: "evidence.integrate",
+  codeMergePropose: "code.merge.propose",
   foundationPromote: "foundation.promote",
   exportCreate: "export.create",
+  publicationWrite: "publication.write",
+  publicationApprove: "publication.approve",
   overrideGate: "gate.override",
   transcriptDecrypt: "transcript.decrypt",
 } as const
@@ -37,7 +40,9 @@ const researcher = new Set<ResearchCapability>([
   ResearchCapability.claimFinalize,
   ResearchCapability.trackReview,
   ResearchCapability.evidenceIntegrate,
+  ResearchCapability.codeMergePropose,
   ResearchCapability.exportCreate,
+  ResearchCapability.publicationWrite,
 ])
 const reviewer = new Set<ResearchCapability>([
   ResearchCapability.protocolApprove,
@@ -46,6 +51,8 @@ const reviewer = new Set<ResearchCapability>([
   ResearchCapability.trackReview,
   ResearchCapability.evidenceIntegrate,
   ResearchCapability.exportCreate,
+  ResearchCapability.publicationWrite,
+  ResearchCapability.publicationApprove,
 ])
 const viewer = new Set<ResearchCapability>()
 
@@ -59,7 +66,9 @@ const humanOnly = new Set<ResearchCapability>([
   ResearchCapability.claimFinalize,
   ResearchCapability.trackReview,
   ResearchCapability.evidenceIntegrate,
+  ResearchCapability.codeMergePropose,
   ResearchCapability.foundationPromote,
+  ResearchCapability.publicationApprove,
   ResearchCapability.overrideGate,
   ResearchCapability.transcriptDecrypt,
 ])
@@ -80,6 +89,7 @@ export namespace Governance {
   ) {
     if (input.actor.kind === "agent") {
       if (humanOnly.has(capability)) return false
+      if (!input.role || !roles[input.role].has(capability)) return false
       return new Set(input.delegatedCapabilities ?? []).has(capability)
     }
     if (input.actor.kind === "system") return false

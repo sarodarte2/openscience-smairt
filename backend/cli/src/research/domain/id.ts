@@ -13,6 +13,8 @@ export const ResearchIDKind = {
   analysis: "rsn",
   review: "rsq",
   integration: "rsx",
+  codeProposal: "rsd",
+  publication: "rsu",
   member: "rsm",
   event: "rse",
   approval: "rsv",

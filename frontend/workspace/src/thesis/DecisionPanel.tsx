@@ -45,6 +45,13 @@ interface Foundation {
   environmentHash: string
   artifactIds: string[]
 }
+interface CodeProposal {
+  id: string
+  evidenceIntegrationId: string
+  sourceCommit: string
+  targetCommit: string
+  state: string
+}
 interface FoundationPreview {
   git: { commit: string | null; branch: string; dirty: boolean; codeSnapshotHash: string }
   environments: { trackId: string; name: string; portableSpecHash: string }[]
@@ -75,10 +82,13 @@ export function DecisionPanel(props: { iterations: Iteration[]; tracks: Track[];
   const [foundations, { refetch: refetchFoundations }] = createResource(() =>
     response<Foundation[]>(fetch(endpoint("/foundations"))),
   )
+  const [proposals, { refetch: refetchProposals }] = createResource(() =>
+    response<CodeProposal[]>(fetch(endpoint("/integrations/code-proposals"))),
+  )
   const [preview, { refetch: refetchPreview }] = createResource(() =>
     response<FoundationPreview>(fetch(endpoint("/foundations/preview"))),
   )
-  const [mode, setMode] = createSignal<"claim" | "review" | "integration" | "foundation" | "">("")
+  const [mode, setMode] = createSignal<"claim" | "review" | "integration" | "code" | "foundation" | "">("")
   const [busy, setBusy] = createSignal(false)
   const [error, setError] = createSignal("")
   const [key, setKey] = createSignal("")
@@ -100,6 +110,13 @@ export function DecisionPanel(props: { iterations: Iteration[]; tracks: Track[];
     confirmed: false,
   })
   const [integration, setIntegration] = createStore({ reviewId: "", confirmed: false })
+  const [code, setCode] = createStore({
+    evidenceIntegrationId: "",
+    sourceCommit: "",
+    targetBranch: "main",
+    targetCommit: "",
+    confirmed: false,
+  })
   const [foundation, setFoundation] = createStore({ environmentTrackId: "", integrationId: "", confirmed: false })
 
   const refresh = () =>
@@ -109,10 +126,15 @@ export function DecisionPanel(props: { iterations: Iteration[]; tracks: Track[];
       refetchReviews(),
       refetchIntegrations(),
       refetchFoundations(),
+      refetchProposals(),
       refetchPreview(),
     ])
   const unsubscribe = sdk.event.on("research.foundation.updated", () => void refresh())
-  onCleanup(unsubscribe)
+  const unsubscribeIntegration = sdk.event.on("research.integration.updated", () => void refresh())
+  onCleanup(() => {
+    unsubscribe()
+    unsubscribeIntegration()
+  })
   const begin = () => {
     const value = key() || crypto.randomUUID()
     setKey(value)
@@ -224,10 +246,32 @@ export function DecisionPanel(props: { iterations: Iteration[]; tracks: Track[];
     }
   }
 
+  const submitCode = async (event: SubmitEvent) => {
+    event.preventDefault()
+    if (!code.confirmed) return
+    const mutation = begin()
+    try {
+      await response(
+        fetch(endpoint("/integrations/code-proposals"), {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Idempotency-Key": mutation },
+          body: JSON.stringify({ ...code, humanConfirmed: true }),
+        }),
+      )
+      await done()
+    } catch (cause) {
+      failed(cause)
+    }
+  }
+
   const open = (value: typeof mode extends () => infer T ? T : never) => {
     setKey("")
     setError("")
     setMode(mode() === value ? "" : value)
+    if (value === "code" && preview()?.git.commit) {
+      if (!code.sourceCommit) setCode("sourceCommit", preview()!.git.commit!)
+      if (!code.targetCommit) setCode("targetCommit", preview()!.git.commit!)
+    }
   }
   return (
     <section style={shell}>
@@ -248,6 +292,9 @@ export function DecisionPanel(props: { iterations: Iteration[]; tracks: Track[];
         </button>
         <button style={button} disabled={props.disabled} onClick={() => open("integration")}>
           Integrate evidence
+        </button>
+        <button style={button} disabled={props.disabled} onClick={() => open("code")}>
+          Propose code
         </button>
         <button style={button} disabled={props.disabled || !preview()?.ready} onClick={() => open("foundation")}>
           Promote foundation
@@ -431,10 +478,65 @@ export function DecisionPanel(props: { iterations: Iteration[]; tracks: Track[];
           </form>
         )}
       </Show>
+      <Show when={mode() === "code"}>
+        <form style={form} onSubmit={submitCode}>
+          <Select
+            label="Evidence integration"
+            value={code.evidenceIntegrationId}
+            onInput={(value) => setCode("evidenceIntegrationId", value)}
+            options={(integrations() ?? []).map((value) => ({
+              value: value.id,
+              label: `${value.sourceTrackId} · ${value.bundleHash.slice(0, 10)}`,
+            }))}
+          />
+          <label style={label}>
+            Exact source commit
+            <input
+              required
+              pattern="[0-9a-f]{40,64}"
+              style={input}
+              value={code.sourceCommit}
+              onInput={(event) => setCode("sourceCommit", event.currentTarget.value)}
+            />
+          </label>
+          <label style={label}>
+            Target branch
+            <input
+              required
+              style={input}
+              value={code.targetBranch}
+              onInput={(event) => setCode("targetBranch", event.currentTarget.value)}
+            />
+          </label>
+          <label style={label}>
+            Exact target commit
+            <input
+              required
+              pattern="[0-9a-f]{40,64}"
+              style={input}
+              value={code.targetCommit}
+              onInput={(event) => setCode("targetCommit", event.currentTarget.value)}
+            />
+          </label>
+          <div style={notice}>
+            This records a reviewable Git diff proposal only. OpenScience will not run merge, rebase, commit, or
+            foundation promotion commands.
+          </div>
+          <Confirm
+            checked={code.confirmed}
+            onChange={(value) => setCode("confirmed", value)}
+            text="I reviewed the exact source and target commits and want to record this proposal."
+          />
+          <button style={primary} disabled={busy() || !code.confirmed}>
+            Sign code proposal
+          </button>
+        </form>
+      </Show>
       <div style={summary}>
         <span>{(claims() ?? []).length} claims</span>
         <span>{(reviews() ?? []).length} reviews</span>
         <span>{(integrations() ?? []).length} integrations</span>
+        <span>{(proposals() ?? []).length} code proposals</span>
         <span>{(foundations() ?? []).length} foundations</span>
       </div>
     </section>

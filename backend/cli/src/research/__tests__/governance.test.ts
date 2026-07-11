@@ -16,9 +16,14 @@ describe("Research governance", () => {
   })
 
   it("allows only explicitly delegated agent capabilities", () => {
-    const context = { actor: agent, delegatedCapabilities: [ResearchCapability.runExecute] }
+    const context = {
+      actor: agent,
+      role: "researcher" as const,
+      delegatedCapabilities: [ResearchCapability.runExecute],
+    }
     expect(Governance.can(context, ResearchCapability.runExecute)).toBeTrue()
     expect(Governance.can(context, ResearchCapability.trackCreate)).toBeFalse()
+    expect(Governance.can({ ...context, role: "viewer" }, ResearchCapability.runExecute)).toBeFalse()
   })
 
   it("rejects AI approval and foundation promotion through the common policy", () => {

@@ -52,6 +52,7 @@ export function RunComposer(props: {
     seed: "",
     timeoutMinutes: "60",
     environmentKeys: "",
+    outputs: "",
     notebookPath: "",
     allowErrors: false,
     passphrase: "",
@@ -99,6 +100,11 @@ export function RunComposer(props: {
                     args: lines(form.args),
                     timeoutMs: Math.round(timeoutMinutes * 60_000),
                     environmentKeys: lines(form.environmentKeys),
+                    outputs: lines(form.outputs).map((path) => ({
+                      path,
+                      role: "output",
+                      mediaType: "application/octet-stream",
+                    })),
                   },
                 },
           ),
@@ -190,6 +196,15 @@ export function RunComposer(props: {
         multiline
         required={false}
       />
+      <Show when={form.kind === "command"}>
+        <Field
+          label="Expected output files — one project-local path per line"
+          value={form.outputs}
+          onInput={(value) => setForm("outputs", value)}
+          multiline
+          required={false}
+        />
+      </Show>
       <Show when={needsPassphrase()}>
         <Field
           label="Signing-key passphrase"

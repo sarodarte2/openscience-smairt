@@ -63,6 +63,16 @@ async function tree(root: string, files: string[]) {
 }
 
 export namespace LocalGit {
+  export async function diffHash(root: string, targetCommit: string, sourceCommit: string) {
+    await Promise.all([
+      git(root, ["cat-file", "-e", `${targetCommit}^{commit}`]),
+      git(root, ["cat-file", "-e", `${sourceCommit}^{commit}`]),
+    ]).catch(() => {
+      throw new Error("Code proposal references an unknown Git commit")
+    })
+    return digest(await raw(root, ["diff", "--binary", targetCommit, sourceCommit, ...SCIENCE_CODE_PATHSPEC]))
+  }
+
   export async function initialize(root: string) {
     await execute("git", ["init", "-q", root], { encoding: "utf8" })
     return inspect(root)

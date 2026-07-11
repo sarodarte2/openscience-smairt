@@ -734,6 +734,43 @@ export type EventResearchEvidenceUpdated = {
   }
 }
 
+export type EventResearchIntegrationUpdated = {
+  type: "research.integration.updated"
+  properties: {
+    version: 1
+    projectId: string
+    subjectType: "evidence" | "code_proposal"
+    subjectId: string
+    eventId: string
+    action: "integrated" | "proposed"
+    replayed: boolean
+  }
+}
+
+export type EventResearchMemberUpdated = {
+  type: "research.member.updated"
+  properties: {
+    version: 1
+    projectId: string
+    memberId: string
+    eventId: string
+    action: "added" | "role_changed" | "removed"
+    replayed: boolean
+  }
+}
+
+export type EventResearchPublicationUpdated = {
+  type: "research.publication.updated"
+  properties: {
+    version: 1
+    projectId: string
+    publicationId: string
+    eventId: string
+    action: "drafted" | "approved"
+    replayed: boolean
+  }
+}
+
 export type EventResearchFoundationUpdated = {
   type: "research.foundation.updated"
   properties: {
@@ -962,6 +999,9 @@ export type Event =
   | EventResearchIterationUpdated
   | EventResearchRunUpdated
   | EventResearchEvidenceUpdated
+  | EventResearchIntegrationUpdated
+  | EventResearchMemberUpdated
+  | EventResearchPublicationUpdated
   | EventResearchFoundationUpdated
   | EventResearchApprovalRequested
   | EventResearchAuditUpdated
@@ -5968,11 +6008,470 @@ export type ResearchAuditResponses = {
       reviews: number
       integrations: number
       foundations: number
+      protocols: number
+      runs: number
     }
   }
 }
 
 export type ResearchAuditResponse = ResearchAuditResponses[keyof ResearchAuditResponses]
+
+export type ResearchAdoptionScanData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+  }
+  url: "/research/adoption"
+}
+
+export type ResearchAdoptionScanResponses = {
+  /**
+   * Read-only adoption report
+   */
+  200: {
+    root: string
+    initialized: boolean
+    candidates: Array<{
+      path: string
+      category: "environment" | "notebook" | "source" | "data" | "result" | "document" | "unknown"
+      confidence: "captured" | "attested" | "imported-unverified"
+      reason: string
+    }>
+    recognized: Array<unknown>
+    uncertain: Array<unknown>
+    ignored: Array<string>
+    conflicts: Array<string>
+    counts: {
+      scanned: number
+      recognized: number
+      uncertain: number
+      conflicts: number
+    }
+  }
+}
+
+export type ResearchAdoptionScanResponse = ResearchAdoptionScanResponses[keyof ResearchAdoptionScanResponses]
+
+export type ResearchExportCreateData = {
+  body?: {
+    destination: string
+    passphrase?: string
+    humanConfirmed: true
+  }
+  path?: never
+  query?: {
+    directory?: string
+  }
+  url: "/research/exports"
+}
+
+export type ResearchExportCreateErrors = {
+  /**
+   * The local identity may not create exports
+   */
+  403: unknown
+  /**
+   * The destination already exists
+   */
+  409: unknown
+}
+
+export type ResearchExportCreateResponses = {
+  /**
+   * Export receipt
+   */
+  200: {
+    destination: string
+    report: unknown
+    fileCount: number
+    manifest: "MANIFEST.sha256"
+  }
+}
+
+export type ResearchExportCreateResponse = ResearchExportCreateResponses[keyof ResearchExportCreateResponses]
+
+export type ResearchMemberListData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+  }
+  url: "/research/members"
+}
+
+export type ResearchMemberListResponses = {
+  /**
+   * Project members
+   */
+  200: Array<{
+    schemaVersion: 1
+    projectId: string
+    createdAt: string
+    createdBy: {
+      kind: "human" | "agent" | "system"
+      id: string
+      displayName: string
+      delegationId?: string
+    }
+    id: string
+    actorId?: string
+    displayName: string
+    email?: string
+    gitName?: string
+    gitEmail?: string
+    role: "owner" | "researcher" | "reviewer" | "viewer"
+    signingKeyId: string
+    active: boolean
+  }>
+}
+
+export type ResearchMemberListResponse = ResearchMemberListResponses[keyof ResearchMemberListResponses]
+
+export type ResearchMemberAddData = {
+  body?: {
+    displayName: string
+    email?: string
+    memberRole: "owner" | "researcher" | "reviewer" | "viewer"
+    signingKeyId: string
+    passphrase?: string
+    humanConfirmed: true
+  }
+  headers: {
+    "idempotency-key": string
+  }
+  path?: never
+  query?: {
+    directory?: string
+  }
+  url: "/research/members"
+}
+
+export type ResearchMemberAddErrors = {
+  /**
+   * Only an owner may manage membership
+   */
+  403: unknown
+  /**
+   * Membership or idempotency conflict
+   */
+  409: unknown
+}
+
+export type ResearchMemberAddResponses = {
+  /**
+   * Signed membership record
+   */
+  200: {
+    member: {
+      schemaVersion: 1
+      projectId: string
+      createdAt: string
+      createdBy: {
+        kind: "human" | "agent" | "system"
+        id: string
+        displayName: string
+        delegationId?: string
+      }
+      id: string
+      actorId?: string
+      displayName: string
+      email?: string
+      gitName?: string
+      gitEmail?: string
+      role: "owner" | "researcher" | "reviewer" | "viewer"
+      signingKeyId: string
+      active: boolean
+    }
+    eventId: string
+    replayed: boolean
+  }
+}
+
+export type ResearchMemberAddResponse = ResearchMemberAddResponses[keyof ResearchMemberAddResponses]
+
+export type ResearchMemberRoleData = {
+  body?: {
+    newRole: "owner" | "researcher" | "reviewer" | "viewer"
+    passphrase?: string
+    humanConfirmed: true
+  }
+  headers: {
+    "idempotency-key": string
+  }
+  path: {
+    memberId: string
+  }
+  query?: {
+    directory?: string
+  }
+  url: "/research/members/{memberId}/role"
+}
+
+export type ResearchMemberRoleErrors = {
+  /**
+   * Only an owner may manage membership
+   */
+  403: unknown
+  /**
+   * The final owner or idempotency constraint blocks this change
+   */
+  409: unknown
+}
+
+export type ResearchMemberRoleResponses = {
+  /**
+   * Updated membership record
+   */
+  200: {
+    member: {
+      schemaVersion: 1
+      projectId: string
+      createdAt: string
+      createdBy: {
+        kind: "human" | "agent" | "system"
+        id: string
+        displayName: string
+        delegationId?: string
+      }
+      id: string
+      actorId?: string
+      displayName: string
+      email?: string
+      gitName?: string
+      gitEmail?: string
+      role: "owner" | "researcher" | "reviewer" | "viewer"
+      signingKeyId: string
+      active: boolean
+    }
+    eventId: string
+    replayed: boolean
+  }
+}
+
+export type ResearchMemberRoleResponse = ResearchMemberRoleResponses[keyof ResearchMemberRoleResponses]
+
+export type ResearchMemberRemoveData = {
+  body?: {
+    passphrase?: string
+    humanConfirmed: true
+  }
+  headers: {
+    "idempotency-key": string
+  }
+  path: {
+    memberId: string
+  }
+  query?: {
+    directory?: string
+  }
+  url: "/research/members/{memberId}"
+}
+
+export type ResearchMemberRemoveErrors = {
+  /**
+   * Only an owner may manage membership
+   */
+  403: unknown
+  /**
+   * The final owner or idempotency constraint blocks removal
+   */
+  409: unknown
+}
+
+export type ResearchMemberRemoveResponses = {
+  /**
+   * Inactive membership record
+   */
+  200: {
+    member: {
+      schemaVersion: 1
+      projectId: string
+      createdAt: string
+      createdBy: {
+        kind: "human" | "agent" | "system"
+        id: string
+        displayName: string
+        delegationId?: string
+      }
+      id: string
+      actorId?: string
+      displayName: string
+      email?: string
+      gitName?: string
+      gitEmail?: string
+      role: "owner" | "researcher" | "reviewer" | "viewer"
+      signingKeyId: string
+      active: boolean
+    }
+    eventId: string
+    replayed: boolean
+  }
+}
+
+export type ResearchMemberRemoveResponse = ResearchMemberRemoveResponses[keyof ResearchMemberRemoveResponses]
+
+export type ResearchPublicationListData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+  }
+  url: "/research/publications"
+}
+
+export type ResearchPublicationListResponses = {
+  /**
+   * Publication records
+   */
+  200: Array<{
+    schemaVersion: 1
+    projectId: string
+    createdAt: string
+    createdBy: {
+      kind: "human" | "agent" | "system"
+      id: string
+      displayName: string
+      delegationId?: string
+    }
+    id: string
+    title: string
+    abstract: string
+    claimIds: Array<string>
+    artifactIds: Array<string>
+    supportState: "approved" | "unresolved"
+    state: "draft" | "approved"
+    aiUseStatement: string
+    contributionStatement: string
+    approvedAt: string | null
+  }>
+}
+
+export type ResearchPublicationListResponse = ResearchPublicationListResponses[keyof ResearchPublicationListResponses]
+
+export type ResearchPublicationCreateData = {
+  body?: {
+    title: string
+    abstract: string
+    claimIds: Array<string>
+    artifactIds?: Array<string>
+    aiUseStatement: string
+    contributionStatement: string
+    passphrase?: string
+    humanConfirmed: true
+  }
+  headers: {
+    "idempotency-key": string
+  }
+  path?: never
+  query?: {
+    directory?: string
+  }
+  url: "/research/publications"
+}
+
+export type ResearchPublicationCreateErrors = {
+  /**
+   * Claims, artifacts, integrity, or idempotency conflict
+   */
+  409: unknown
+}
+
+export type ResearchPublicationCreateResponses = {
+  /**
+   * Signed publication draft
+   */
+  200: {
+    publication: {
+      schemaVersion: 1
+      projectId: string
+      createdAt: string
+      createdBy: {
+        kind: "human" | "agent" | "system"
+        id: string
+        displayName: string
+        delegationId?: string
+      }
+      id: string
+      title: string
+      abstract: string
+      claimIds: Array<string>
+      artifactIds: Array<string>
+      supportState: "approved" | "unresolved"
+      state: "draft" | "approved"
+      aiUseStatement: string
+      contributionStatement: string
+      approvedAt: string | null
+    }
+    eventId: string
+    replayed: boolean
+  }
+}
+
+export type ResearchPublicationCreateResponse =
+  ResearchPublicationCreateResponses[keyof ResearchPublicationCreateResponses]
+
+export type ResearchPublicationApproveData = {
+  body?: {
+    passphrase?: string
+    humanConfirmed: true
+  }
+  headers: {
+    "idempotency-key": string
+  }
+  path: {
+    publicationId: string
+  }
+  query?: {
+    directory?: string
+  }
+  url: "/research/publications/{publicationId}/approve"
+}
+
+export type ResearchPublicationApproveErrors = {
+  /**
+   * AI and unauthorized roles cannot approve publication
+   */
+  403: unknown
+  /**
+   * Unresolved claims or idempotency conflict
+   */
+  409: unknown
+}
+
+export type ResearchPublicationApproveResponses = {
+  /**
+   * Approved publication
+   */
+  200: {
+    publication: {
+      schemaVersion: 1
+      projectId: string
+      createdAt: string
+      createdBy: {
+        kind: "human" | "agent" | "system"
+        id: string
+        displayName: string
+        delegationId?: string
+      }
+      id: string
+      title: string
+      abstract: string
+      claimIds: Array<string>
+      artifactIds: Array<string>
+      supportState: "approved" | "unresolved"
+      state: "draft" | "approved"
+      aiUseStatement: string
+      contributionStatement: string
+      approvedAt: string | null
+    }
+    eventId: string
+    replayed: boolean
+  }
+}
+
+export type ResearchPublicationApproveResponse =
+  ResearchPublicationApproveResponses[keyof ResearchPublicationApproveResponses]
 
 export type ResearchInitializeData = {
   body?: {
@@ -6745,6 +7244,11 @@ export type ResearchRunListResponses = {
       cwd: string
       timeoutMs: number
       environmentKeys: Array<string>
+      outputs?: Array<{
+        path: string
+        role: "input" | "output" | "dataset" | "model" | "figure" | "table" | "notebook" | "log" | "other"
+        mediaType: string
+      }>
     }
     state: "declared" | "queued" | "running" | "succeeded" | "failed" | "timed_out" | "cancelled" | "lost"
     result?: {
@@ -6777,6 +7281,11 @@ export type ResearchRunDeclareData = {
       cwd?: string
       timeoutMs?: number
       environmentKeys?: Array<string>
+      outputs?: Array<{
+        path: string
+        role: "input" | "output" | "dataset" | "model" | "figure" | "table" | "notebook" | "log" | "other"
+        mediaType: string
+      }>
     }
     passphrase?: string
     humanConfirmed: true
@@ -6863,6 +7372,11 @@ export type ResearchRunDeclareResponses = {
         cwd: string
         timeoutMs: number
         environmentKeys: Array<string>
+        outputs?: Array<{
+          path: string
+          role: "input" | "output" | "dataset" | "model" | "figure" | "table" | "notebook" | "log" | "other"
+          mediaType: string
+        }>
       }
       state: "declared" | "queued" | "running" | "succeeded" | "failed" | "timed_out" | "cancelled" | "lost"
       result?: {
@@ -6981,6 +7495,11 @@ export type ResearchRunNotebookDeclareResponses = {
         cwd: string
         timeoutMs: number
         environmentKeys: Array<string>
+        outputs?: Array<{
+          path: string
+          role: "input" | "output" | "dataset" | "model" | "figure" | "table" | "notebook" | "log" | "other"
+          mediaType: string
+        }>
       }
       state: "declared" | "queued" | "running" | "succeeded" | "failed" | "timed_out" | "cancelled" | "lost"
       result?: {
@@ -7092,6 +7611,11 @@ export type ResearchRunExecuteResponses = {
         cwd: string
         timeoutMs: number
         environmentKeys: Array<string>
+        outputs?: Array<{
+          path: string
+          role: "input" | "output" | "dataset" | "model" | "figure" | "table" | "notebook" | "log" | "other"
+          mediaType: string
+        }>
       }
       state: "declared" | "queued" | "running" | "succeeded" | "failed" | "timed_out" | "cancelled" | "lost"
       result?: {
@@ -7111,6 +7635,27 @@ export type ResearchRunExecuteResponses = {
     }
     eventId: string
     replayed: boolean
+    artifacts?: Array<{
+      schemaVersion: 1
+      projectId: string
+      createdAt: string
+      createdBy: {
+        kind: "human" | "agent" | "system"
+        id: string
+        displayName: string
+        delegationId?: string
+      }
+      id: string
+      iterationId: string
+      runId: string | null
+      path: string
+      role: "input" | "output" | "dataset" | "model" | "figure" | "table" | "notebook" | "log" | "other"
+      mediaType: string
+      byteLength: number
+      contentHash: string
+      captureConfidence: "complete" | "best_effort"
+    }>
+    missingOutputs?: Array<string>
   }
 }
 
@@ -7603,6 +8148,109 @@ export type ResearchIntegrationEvidenceResponses = {
 
 export type ResearchIntegrationEvidenceResponse =
   ResearchIntegrationEvidenceResponses[keyof ResearchIntegrationEvidenceResponses]
+
+export type ResearchIntegrationCodeListData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+  }
+  url: "/research/integrations/code-proposals"
+}
+
+export type ResearchIntegrationCodeListResponses = {
+  /**
+   * Code merge proposals
+   */
+  200: Array<{
+    schemaVersion: 1
+    projectId: string
+    createdAt: string
+    createdBy: {
+      kind: "human" | "agent" | "system"
+      id: string
+      displayName: string
+      delegationId?: string
+    }
+    id: string
+    evidenceIntegrationId: string
+    sourceTrackId: string
+    sourceBranch: string
+    sourceCommit: string
+    targetBranch: string
+    targetCommit: string
+    diffHash: string
+    state: "proposed"
+    instructions: string
+  }>
+}
+
+export type ResearchIntegrationCodeListResponse =
+  ResearchIntegrationCodeListResponses[keyof ResearchIntegrationCodeListResponses]
+
+export type ResearchIntegrationCodeProposeData = {
+  body?: {
+    evidenceIntegrationId: string
+    sourceCommit: string
+    targetBranch: string
+    targetCommit: string
+    passphrase?: string
+    humanConfirmed: true
+  }
+  headers: {
+    "idempotency-key": string
+  }
+  path?: never
+  query?: {
+    directory?: string
+  }
+  url: "/research/integrations/code-proposals"
+}
+
+export type ResearchIntegrationCodeProposeErrors = {
+  /**
+   * Only an authorized human project member may propose a code merge
+   */
+  403: unknown
+  /**
+   * Git reference, integrity, or idempotency conflict
+   */
+  409: unknown
+}
+
+export type ResearchIntegrationCodeProposeResponses = {
+  /**
+   * Signed code merge proposal
+   */
+  200: {
+    proposal: {
+      schemaVersion: 1
+      projectId: string
+      createdAt: string
+      createdBy: {
+        kind: "human" | "agent" | "system"
+        id: string
+        displayName: string
+        delegationId?: string
+      }
+      id: string
+      evidenceIntegrationId: string
+      sourceTrackId: string
+      sourceBranch: string
+      sourceCommit: string
+      targetBranch: string
+      targetCommit: string
+      diffHash: string
+      state: "proposed"
+      instructions: string
+    }
+    eventId: string
+    replayed: boolean
+  }
+}
+
+export type ResearchIntegrationCodeProposeResponse =
+  ResearchIntegrationCodeProposeResponses[keyof ResearchIntegrationCodeProposeResponses]
 
 export type ResearchFoundationPreviewData = {
   body?: never

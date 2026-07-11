@@ -61,6 +61,40 @@ export const ResearchEvents = {
       replayed: z.boolean(),
     }),
   ),
+  IntegrationUpdated: BusEvent.define(
+    "research.integration.updated",
+    z.object({
+      version: Version,
+      projectId: ResearchID.schema("project"),
+      subjectType: z.enum(["evidence", "code_proposal"]),
+      subjectId: z.string().min(1),
+      eventId: ResearchID.schema("event"),
+      action: z.enum(["integrated", "proposed"]),
+      replayed: z.boolean(),
+    }),
+  ),
+  MemberUpdated: BusEvent.define(
+    "research.member.updated",
+    z.object({
+      version: Version,
+      projectId: ResearchID.schema("project"),
+      memberId: ResearchID.schema("member"),
+      eventId: ResearchID.schema("event"),
+      action: z.enum(["added", "role_changed", "removed"]),
+      replayed: z.boolean(),
+    }),
+  ),
+  PublicationUpdated: BusEvent.define(
+    "research.publication.updated",
+    z.object({
+      version: Version,
+      projectId: ResearchID.schema("project"),
+      publicationId: ResearchID.schema("publication"),
+      eventId: ResearchID.schema("event"),
+      action: z.enum(["drafted", "approved"]),
+      replayed: z.boolean(),
+    }),
+  ),
   FoundationUpdated: BusEvent.define(
     "research.foundation.updated",
     z.object({

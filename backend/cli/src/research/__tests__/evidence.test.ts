@@ -9,6 +9,8 @@ import { InvestigationService } from "../application/investigation"
 import { ResearchEvidenceService } from "../application/evidence"
 import { ResearchReviewService } from "../application/review"
 import { ResearchFoundationService } from "../application/foundation"
+import { ResearchIntegrationService } from "../application/integration"
+import { ResearchPublicationService } from "../application/publication"
 import { ResearchAudit } from "../application/audit"
 import { Ed25519 } from "../domain/signature"
 
@@ -151,9 +153,53 @@ describe("Research evidence", () => {
       claimIds: [claim.claim.id],
       artifactIds: [registered.artifact.id],
     })
+    const publication = await ResearchPublicationService.create({
+      projectRoot: root,
+      title: "Artifact integrity result",
+      abstract: "A bounded report of an inconclusive integrity exercise.",
+      claimIds: [claim.claim.id],
+      artifactIds: [registered.artifact.id],
+      aiUseStatement: "AI assisted with drafting; the signed scientific decisions are human-authored.",
+      contributionStatement: "The local researcher designed, executed, reviewed, and approved the study record.",
+      actor,
+      role: "researcher",
+      signer,
+      idempotencyKey: "publication-integrity-draft",
+    })
+    expect(publication.publication).toMatchObject({ state: "draft", supportState: "unresolved" })
+    await expect(
+      ResearchPublicationService.approve({
+        projectRoot: root,
+        publicationId: publication.publication.id,
+        actor,
+        role: "reviewer",
+        signer,
+      }),
+    ).rejects.toThrow("Unresolved claims")
     await execute("git", ["-C", root, "add", "results.csv", ".gitignore"])
     await execute("git", ["-C", root, "commit", "-qm", "Add verified result"])
     const commit = (await execute("git", ["-C", root, "rev-parse", "HEAD"])).stdout.trim()
+    const proposal = await ResearchIntegrationService.proposeCodeMerge({
+      projectRoot: root,
+      evidenceIntegrationId: integration.integration.id,
+      sourceCommit: commit,
+      targetBranch: "main",
+      targetCommit: commit,
+      actor,
+      role: "researcher",
+      signer,
+      idempotencyKey: "proposal-integrity-code",
+    })
+    expect(proposal).toMatchObject({
+      proposal: {
+        evidenceIntegrationId: integration.integration.id,
+        sourceCommit: commit,
+        targetCommit: commit,
+        state: "proposed",
+      },
+      replayed: false,
+    })
+    expect(proposal.proposal.instructions).toContain("does not merge code or promote a foundation")
     const promoted = await ResearchFoundationService.promote({
       projectRoot: root,
       expectedGitCommit: commit,
