@@ -329,7 +329,9 @@ export const FoundationRevision = RecordBase.extend({
   gitCommit: z.string().regex(/^[0-9a-f]{40,64}$/),
   codeSnapshotHash: Hash,
   environmentHash: Hash,
+  environmentSpecPath: z.string().min(1),
   artifactIds: z.array(ResearchID.schema("artifact")),
+  integrationIds: z.array(ResearchID.schema("integration")).min(1),
   supportingEventIds: z.array(ResearchID.schema("event")),
   promotedByEventId: ResearchID.schema("event"),
 }).strict()

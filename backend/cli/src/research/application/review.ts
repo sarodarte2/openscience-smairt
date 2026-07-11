@@ -92,6 +92,7 @@ export namespace ResearchReviewService {
       analysisIds: string[]
       artifactIds: string[]
       finalize?: boolean
+      idempotencyKey?: string
     },
   ) {
     Governance.authorize(input, input.finalize ? ResearchCapability.claimFinalize : ResearchCapability.analysisWrite)
@@ -124,6 +125,16 @@ export namespace ResearchReviewService {
         throw new Error("A finalized claim may not reference missing or corrupted artifacts")
       }
     }
+    const request: JsonValue = {
+      actorId: input.actor.id,
+      iterationId: input.iterationId,
+      statement: input.statement,
+      scope: input.scope,
+      uncertainties: input.uncertainties,
+      analysisIds: [...new Set(input.analysisIds)],
+      artifactIds: [...new Set(input.artifactIds)],
+      finalize: input.finalize ?? false,
+    }
     const now = new Date().toISOString()
     const claim = ScientificClaim.parse({
       schemaVersion: 1,
@@ -140,17 +151,36 @@ export namespace ResearchReviewService {
       createdAt: now,
       createdBy: input.actor,
     })
-    const event = await FilesystemLedger.append({
-      projectRoot: root,
-      projectId: project.id,
-      type: input.finalize ? "claim.finalized" : "claim.created",
-      actor: input.actor,
-      payload: { claim },
-      signer: input.signer,
-      occurredAt: now,
-    })
-    await atomic(path.join(root, `.openscience/research/claims/${claim.id}.json`), claim as JsonValue)
-    return { claim, eventId: event.eventId }
+    const type = input.finalize ? "claim.finalized" : "claim.created"
+    const appended = input.idempotencyKey
+      ? await FilesystemLedger.appendIdempotent({
+          projectRoot: root,
+          projectId: project.id,
+          type,
+          actor: input.actor,
+          payload: { claim },
+          signer: input.signer,
+          occurredAt: now,
+          key: input.idempotencyKey,
+          request,
+        })
+      : {
+          event: await FilesystemLedger.append({
+            projectRoot: root,
+            projectId: project.id,
+            type,
+            actor: input.actor,
+            payload: { claim },
+            signer: input.signer,
+            occurredAt: now,
+          }),
+          replayed: false,
+        }
+    const value = appended.replayed
+      ? ScientificClaim.parse((appended.event.payload as Record<string, unknown>).claim)
+      : claim
+    await atomic(path.join(root, `.openscience/research/claims/${value.id}.json`), value as JsonValue)
+    return { claim: value, eventId: appended.event.eventId, replayed: appended.replayed }
   }
 
   export async function reviewTrack(
@@ -161,6 +191,7 @@ export namespace ResearchReviewService {
       analysisIds: string[]
       outcome: TrackReview["outcome"]
       rationale: string
+      idempotencyKey?: string
     },
   ) {
     Governance.authorize(input, ResearchCapability.trackReview)
@@ -186,6 +217,14 @@ export namespace ResearchReviewService {
     if (analyses.some((value) => value.state !== "finalized" || !iterationIds.has(value.iterationId))) {
       throw new Error("Track review requires finalized analyses from the reviewed track")
     }
+    const request: JsonValue = {
+      actorId: input.actor.id,
+      trackId: input.trackId,
+      claimIds: [...new Set(input.claimIds)],
+      analysisIds: [...new Set(input.analysisIds)],
+      outcome: input.outcome,
+      rationale: input.rationale,
+    }
     const now = new Date().toISOString()
     const review = TrackReview.parse({
       schemaVersion: 1,
@@ -202,21 +241,41 @@ export namespace ResearchReviewService {
     })
     const state = input.outcome === "return_for_changes" ? "review_ready" : input.outcome
     const updatedTrack = ResearchTrack.parse({ ...track, state })
-    const event = await FilesystemLedger.append({
-      projectRoot: root,
-      projectId: project.id,
-      type: "track.reviewed",
-      actor: input.actor,
-      payload: { review, track: updatedTrack },
-      signer: input.signer,
-      occurredAt: now,
-    })
-    await atomic(path.join(root, `.openscience/research/reviews/${review.id}.json`), review as JsonValue)
-    await atomic(trackFile, updatedTrack as JsonValue)
-    return { review, track: updatedTrack, eventId: event.eventId }
+    const appended = input.idempotencyKey
+      ? await FilesystemLedger.appendIdempotent({
+          projectRoot: root,
+          projectId: project.id,
+          type: "track.reviewed",
+          actor: input.actor,
+          payload: { review, track: updatedTrack },
+          signer: input.signer,
+          occurredAt: now,
+          key: input.idempotencyKey,
+          request,
+        })
+      : {
+          event: await FilesystemLedger.append({
+            projectRoot: root,
+            projectId: project.id,
+            type: "track.reviewed",
+            actor: input.actor,
+            payload: { review, track: updatedTrack },
+            signer: input.signer,
+            occurredAt: now,
+          }),
+          replayed: false,
+        }
+    const payload = appended.event.payload as Record<string, unknown>
+    const reviewValue = appended.replayed ? TrackReview.parse(payload.review) : review
+    const trackValue = appended.replayed ? ResearchTrack.parse(payload.track) : updatedTrack
+    await atomic(path.join(root, `.openscience/research/reviews/${reviewValue.id}.json`), reviewValue as JsonValue)
+    await atomic(trackFile, trackValue as JsonValue)
+    return { review: reviewValue, track: trackValue, eventId: appended.event.eventId, replayed: appended.replayed }
   }
 
-  export async function integrateEvidenceOnly(input: Authorization & { projectRoot: string; reviewId: string }) {
+  export async function integrateEvidenceOnly(
+    input: Authorization & { projectRoot: string; reviewId: string; idempotencyKey?: string },
+  ) {
     Governance.authorize(input, ResearchCapability.evidenceIntegrate)
     const { root, project } = await context(input.projectRoot)
     const review = await load(
@@ -244,6 +303,7 @@ export namespace ResearchReviewService {
     const supportingEventIds = audit.events
       .filter((event) => [...related].some((id) => JSON.stringify(event.payload).includes(id)))
       .map((event) => event.eventId)
+    const request: JsonValue = { actorId: input.actor.id, reviewId: input.reviewId }
     const now = new Date().toISOString()
     const content = {
       sourceTrackId: review.trackId,
@@ -266,16 +326,34 @@ export namespace ResearchReviewService {
       createdAt: now,
       createdBy: input.actor,
     })
-    const event = await FilesystemLedger.append({
-      projectRoot: root,
-      projectId: project.id,
-      type: "evidence.integrated",
-      actor: input.actor,
-      payload: { integration },
-      signer: input.signer,
-      occurredAt: now,
-    })
-    await atomic(path.join(root, `.openscience/research/integrations/${integration.id}.json`), integration as JsonValue)
-    return { integration, eventId: event.eventId }
+    const appended = input.idempotencyKey
+      ? await FilesystemLedger.appendIdempotent({
+          projectRoot: root,
+          projectId: project.id,
+          type: "evidence.integrated",
+          actor: input.actor,
+          payload: { integration },
+          signer: input.signer,
+          occurredAt: now,
+          key: input.idempotencyKey,
+          request,
+        })
+      : {
+          event: await FilesystemLedger.append({
+            projectRoot: root,
+            projectId: project.id,
+            type: "evidence.integrated",
+            actor: input.actor,
+            payload: { integration },
+            signer: input.signer,
+            occurredAt: now,
+          }),
+          replayed: false,
+        }
+    const value = appended.replayed
+      ? EvidenceIntegration.parse((appended.event.payload as Record<string, unknown>).integration)
+      : integration
+    await atomic(path.join(root, `.openscience/research/integrations/${value.id}.json`), value as JsonValue)
+    return { integration: value, eventId: appended.event.eventId, replayed: appended.replayed }
   }
 }

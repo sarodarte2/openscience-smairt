@@ -122,6 +122,7 @@ export namespace ResearchEvidenceService {
       artifactRole: ArtifactManifest["role"]
       mediaType: string
       runId?: string
+      idempotencyKey?: string
     },
   ) {
     Governance.authorize(input, ResearchCapability.analysisWrite)
@@ -132,6 +133,17 @@ export namespace ResearchEvidenceService {
     if (!contained(root, resolved)) throw new Error("Artifact must resolve to a regular file inside the project")
     const stat = await lstat(resolved)
     if (!stat.isFile()) throw new Error("Artifact must resolve to a regular file inside the project")
+    const contentHash = await digest(resolved)
+    const request: JsonValue = {
+      actorId: input.actor.id,
+      iterationId: input.iterationId,
+      path: path.relative(root, requested),
+      role: input.artifactRole,
+      mediaType: input.mediaType,
+      runId: input.runId ?? null,
+      byteLength: stat.size,
+      contentHash,
+    }
     const now = new Date().toISOString()
     const artifact = ArtifactManifest.parse({
       schemaVersion: 1,
@@ -143,22 +155,40 @@ export namespace ResearchEvidenceService {
       role: input.artifactRole,
       mediaType: input.mediaType,
       byteLength: stat.size,
-      contentHash: await digest(resolved),
+      contentHash,
       captureConfidence: "complete",
       createdAt: now,
       createdBy: input.actor,
     })
-    const event = await FilesystemLedger.append({
-      projectRoot: root,
-      projectId: project.id,
-      type: "artifact.registered",
-      actor: input.actor,
-      payload: { artifact },
-      signer: input.signer,
-      occurredAt: now,
-    })
-    await atomic(path.join(root, `.openscience/research/artifacts/${artifact.id}.json`), artifact as JsonValue)
-    return { artifact, eventId: event.eventId }
+    const appended = input.idempotencyKey
+      ? await FilesystemLedger.appendIdempotent({
+          projectRoot: root,
+          projectId: project.id,
+          type: "artifact.registered",
+          actor: input.actor,
+          payload: { artifact },
+          signer: input.signer,
+          occurredAt: now,
+          key: input.idempotencyKey,
+          request,
+        })
+      : {
+          event: await FilesystemLedger.append({
+            projectRoot: root,
+            projectId: project.id,
+            type: "artifact.registered",
+            actor: input.actor,
+            payload: { artifact },
+            signer: input.signer,
+            occurredAt: now,
+          }),
+          replayed: false,
+        }
+    const value = appended.replayed
+      ? ArtifactManifest.parse((appended.event.payload as Record<string, unknown>).artifact)
+      : artifact
+    await atomic(path.join(root, `.openscience/research/artifacts/${value.id}.json`), value as JsonValue)
+    return { artifact: value, eventId: appended.event.eventId, replayed: appended.replayed }
   }
 
   export async function verifyArtifacts(projectRoot: string) {
@@ -200,11 +230,24 @@ export namespace ResearchEvidenceService {
       runIds: string[]
       artifactIds: string[]
       finalize?: boolean
+      idempotencyKey?: string
     },
   ) {
     Governance.authorize(input, ResearchCapability.analysisWrite)
     const { root, project } = await context(input.projectRoot)
     await ensureReferences(root, project.id, input.iterationId, input.runIds, input.artifactIds)
+    const request: JsonValue = {
+      actorId: input.actor.id,
+      iterationId: input.iterationId,
+      title: input.title,
+      summary: input.summary,
+      methods: input.methods,
+      findings: input.findings,
+      limitations: input.limitations,
+      runIds: [...new Set(input.runIds)],
+      artifactIds: [...new Set(input.artifactIds)],
+      finalize: input.finalize ?? false,
+    }
     const now = new Date().toISOString()
     const analysis = ScientificAnalysis.parse({
       schemaVersion: 1,
@@ -223,16 +266,35 @@ export namespace ResearchEvidenceService {
       createdAt: now,
       createdBy: input.actor,
     })
-    const event = await FilesystemLedger.append({
-      projectRoot: root,
-      projectId: project.id,
-      type: input.finalize ? "analysis.finalized" : "analysis.created",
-      actor: input.actor,
-      payload: { analysis },
-      signer: input.signer,
-      occurredAt: now,
-    })
-    await atomic(path.join(root, `.openscience/research/analyses/${analysis.id}.json`), analysis as JsonValue)
-    return { analysis, eventId: event.eventId }
+    const type = input.finalize ? "analysis.finalized" : "analysis.created"
+    const appended = input.idempotencyKey
+      ? await FilesystemLedger.appendIdempotent({
+          projectRoot: root,
+          projectId: project.id,
+          type,
+          actor: input.actor,
+          payload: { analysis },
+          signer: input.signer,
+          occurredAt: now,
+          key: input.idempotencyKey,
+          request,
+        })
+      : {
+          event: await FilesystemLedger.append({
+            projectRoot: root,
+            projectId: project.id,
+            type,
+            actor: input.actor,
+            payload: { analysis },
+            signer: input.signer,
+            occurredAt: now,
+          }),
+          replayed: false,
+        }
+    const value = appended.replayed
+      ? ScientificAnalysis.parse((appended.event.payload as Record<string, unknown>).analysis)
+      : analysis
+    await atomic(path.join(root, `.openscience/research/analyses/${value.id}.json`), value as JsonValue)
+    return { analysis: value, eventId: appended.event.eventId, replayed: appended.replayed }
   }
 }

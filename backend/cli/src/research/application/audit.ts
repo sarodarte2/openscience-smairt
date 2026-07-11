@@ -1,5 +1,18 @@
 import { FilesystemLedger, type LedgerDiagnostic } from "../adapters/ledger/filesystem"
-import { ProjectMember } from "../domain/schema"
+import path from "node:path"
+import { createHash } from "node:crypto"
+import { createReadStream } from "node:fs"
+import { lstat, readFile, readdir, realpath } from "node:fs/promises"
+import {
+  ArtifactManifest,
+  EvidenceIntegration,
+  FoundationRevision,
+  ProjectMember,
+  ResearchProject,
+  ScientificAnalysis,
+  ScientificClaim,
+  TrackReview,
+} from "../domain/schema"
 import type { ResearchEvent } from "../domain/event"
 
 export interface TrustDiagnostic {
@@ -11,6 +24,24 @@ export interface TrustDiagnostic {
     | "unauthorized_member_add"
     | "unauthorized_member_remove"
     | "final_owner_remove"
+  file: string
+  message: string
+}
+
+export interface ScientificDiagnostic {
+  code:
+    | "invalid_projection"
+    | "artifact_missing"
+    | "artifact_hash_mismatch"
+    | "artifact_size_mismatch"
+    | "claim_missing_analysis"
+    | "claim_missing_artifact"
+    | "claim_unfinalized_analysis"
+    | "review_missing_claim"
+    | "review_missing_analysis"
+    | "integration_missing_review"
+    | "integration_missing_artifact"
+    | "active_foundation_missing"
   file: string
   message: string
 }
@@ -65,6 +96,134 @@ function membership(owner: Member, ancestors: Set<string>, changes: MembershipCh
 }
 
 export namespace ResearchAudit {
+  export async function inspectScientific(projectRoot: string) {
+    const canonicalRoot = await realpath(projectRoot).catch(() => path.resolve(projectRoot))
+    const diagnostics: ScientificDiagnostic[] = []
+    const loadDirectory = async <T>(relative: string, parse: (value: unknown) => T) => {
+      const directory = path.join(projectRoot, relative)
+      const names = await readdir(directory).catch(() => [])
+      const values: T[] = []
+      for (const name of names.filter((value) => value.endsWith(".json"))) {
+        const file = path.join(directory, name)
+        try {
+          values.push(parse(JSON.parse(await readFile(file, "utf8"))))
+        } catch (error) {
+          diagnostics.push({
+            code: "invalid_projection",
+            file,
+            message: error instanceof Error ? error.message : "Invalid projection",
+          })
+        }
+      }
+      return values
+    }
+    const [artifacts, analyses, claims, reviews, integrations, foundations] = await Promise.all([
+      loadDirectory(".openscience/research/artifacts", ArtifactManifest.parse),
+      loadDirectory(".openscience/research/analyses", ScientificAnalysis.parse),
+      loadDirectory(".openscience/research/claims", ScientificClaim.parse),
+      loadDirectory(".openscience/research/reviews", TrackReview.parse),
+      loadDirectory(".openscience/research/integrations", EvidenceIntegration.parse),
+      loadDirectory(".openscience/research/foundations", FoundationRevision.parse),
+    ])
+    const artifactById = new Map(artifacts.map((value) => [value.id, value]))
+    const analysisById = new Map(analyses.map((value) => [value.id, value]))
+    const claimById = new Map(claims.map((value) => [value.id, value]))
+    const reviewById = new Map(reviews.map((value) => [value.id, value]))
+    for (const artifact of artifacts) {
+      const file = path.resolve(canonicalRoot, artifact.path)
+      try {
+        const resolved = await realpath(file)
+        const relative = path.relative(canonicalRoot, resolved)
+        if (relative.startsWith("..") || path.isAbsolute(relative)) throw new Error("Artifact path escapes project")
+        const stat = await lstat(resolved)
+        if (!stat.isFile()) throw new Error("Artifact is not a regular file")
+        if (stat.size !== artifact.byteLength)
+          diagnostics.push({
+            code: "artifact_size_mismatch",
+            file: artifact.id,
+            message: `Expected ${artifact.byteLength} bytes; found ${stat.size}`,
+          })
+        const hash = createHash("sha256")
+        for await (const chunk of createReadStream(resolved)) hash.update(chunk)
+        const actual = hash.digest("hex")
+        if (actual !== artifact.contentHash)
+          diagnostics.push({
+            code: "artifact_hash_mismatch",
+            file: artifact.id,
+            message: `Expected ${artifact.contentHash}; found ${actual}`,
+          })
+      } catch (error) {
+        diagnostics.push({
+          code: "artifact_missing",
+          file: artifact.id,
+          message: error instanceof Error ? error.message : "Artifact unavailable",
+        })
+      }
+    }
+    for (const claim of claims) {
+      for (const id of claim.analysisIds) {
+        const analysis = analysisById.get(id)
+        if (!analysis)
+          diagnostics.push({ code: "claim_missing_analysis", file: claim.id, message: `Missing analysis ${id}` })
+        else if (claim.state === "finalized" && analysis.state !== "finalized")
+          diagnostics.push({
+            code: "claim_unfinalized_analysis",
+            file: claim.id,
+            message: `Analysis ${id} is not finalized`,
+          })
+      }
+      for (const id of claim.artifactIds)
+        if (!artifactById.has(id))
+          diagnostics.push({ code: "claim_missing_artifact", file: claim.id, message: `Missing artifact ${id}` })
+    }
+    for (const review of reviews) {
+      for (const id of review.claimIds)
+        if (!claimById.has(id))
+          diagnostics.push({ code: "review_missing_claim", file: review.id, message: `Missing claim ${id}` })
+      for (const id of review.analysisIds)
+        if (!analysisById.has(id))
+          diagnostics.push({ code: "review_missing_analysis", file: review.id, message: `Missing analysis ${id}` })
+    }
+    for (const integration of integrations) {
+      if (!reviewById.has(integration.reviewId))
+        diagnostics.push({
+          code: "integration_missing_review",
+          file: integration.id,
+          message: `Missing review ${integration.reviewId}`,
+        })
+      for (const id of integration.artifactIds)
+        if (!artifactById.has(id))
+          diagnostics.push({
+            code: "integration_missing_artifact",
+            file: integration.id,
+            message: `Missing artifact ${id}`,
+          })
+    }
+    const projectFile = path.join(projectRoot, ".openscience/research/project.json")
+    const project = await readFile(projectFile, "utf8")
+      .then((value) => ResearchProject.parse(JSON.parse(value)))
+      .catch(() => null)
+    if (project?.activeFoundationId && !foundations.some((value) => value.id === project.activeFoundationId)) {
+      diagnostics.push({
+        code: "active_foundation_missing",
+        file: projectFile,
+        message: `Missing active foundation ${project.activeFoundationId}`,
+      })
+    }
+    return {
+      diagnostics,
+      valid: diagnostics.length === 0,
+      counts: {
+        artifacts: artifacts.length,
+        analyses: analyses.length,
+        claims: claims.length,
+        reviews: reviews.length,
+        integrations: integrations.length,
+        foundations: foundations.length,
+      },
+    }
+  }
+
   export async function inspect(projectRoot: string): Promise<{
     events: Awaited<ReturnType<typeof FilesystemLedger.inspect>>["events"]
     diagnostics: (LedgerDiagnostic | TrustDiagnostic)[]

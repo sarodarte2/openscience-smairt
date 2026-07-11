@@ -61,6 +61,17 @@ export const ResearchEvents = {
       replayed: z.boolean(),
     }),
   ),
+  FoundationUpdated: BusEvent.define(
+    "research.foundation.updated",
+    z.object({
+      version: Version,
+      projectId: ResearchID.schema("project"),
+      foundationId: ResearchID.schema("foundation"),
+      eventId: ResearchID.schema("event"),
+      action: z.literal("promoted"),
+      replayed: z.boolean(),
+    }),
+  ),
   ApprovalRequested: BusEvent.define(
     "research.approval.requested",
     z.object({

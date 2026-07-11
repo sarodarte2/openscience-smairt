@@ -8,6 +8,8 @@ import { ResearchProjectService } from "../application/project"
 import { InvestigationService } from "../application/investigation"
 import { ResearchEvidenceService } from "../application/evidence"
 import { ResearchReviewService } from "../application/review"
+import { ResearchFoundationService } from "../application/foundation"
+import { ResearchAudit } from "../application/audit"
 import { Ed25519 } from "../domain/signature"
 
 const execute = promisify(execFile)
@@ -68,11 +70,28 @@ describe("Research evidence", () => {
       actor,
       role: "researcher",
       signer,
+      idempotencyKey: "artifact-results-table",
     })
     expect(registered.artifact).toMatchObject({ path: "results.csv", role: "table", captureConfidence: "complete" })
     expect(await ResearchEvidenceService.verifyArtifacts(root)).toMatchObject([
       { artifact: { id: registered.artifact.id }, valid: true },
     ])
+    const replayedArtifact = await ResearchEvidenceService.registerArtifact({
+      projectRoot: root,
+      iterationId: current.iteration.id,
+      file: "results.csv",
+      artifactRole: "table",
+      mediaType: "text/csv",
+      actor,
+      role: "researcher",
+      signer,
+      idempotencyKey: "artifact-results-table",
+    })
+    expect(replayedArtifact).toMatchObject({
+      artifact: { id: registered.artifact.id },
+      eventId: registered.eventId,
+      replayed: true,
+    })
 
     const analysis = await ResearchEvidenceService.createAnalysis({
       projectRoot: root,
@@ -88,6 +107,7 @@ describe("Research evidence", () => {
       actor,
       role: "researcher",
       signer,
+      idempotencyKey: "analysis-integrity-result",
     })
     expect(analysis.analysis).toMatchObject({ state: "finalized", artifactIds: [registered.artifact.id] })
 
@@ -103,6 +123,7 @@ describe("Research evidence", () => {
       actor,
       role: "researcher",
       signer,
+      idempotencyKey: "claim-integrity-result",
     })
     const review = await ResearchReviewService.reviewTrack({
       projectRoot: root,
@@ -114,6 +135,7 @@ describe("Research evidence", () => {
       actor,
       role: "reviewer",
       signer,
+      idempotencyKey: "review-integrity-track",
     })
     const integration = await ResearchReviewService.integrateEvidenceOnly({
       projectRoot: root,
@@ -121,6 +143,7 @@ describe("Research evidence", () => {
       actor,
       role: "reviewer",
       signer,
+      idempotencyKey: "integrate-integrity-evidence",
     })
     expect(integration.integration).toMatchObject({
       mode: "evidence_only",
@@ -128,11 +151,52 @@ describe("Research evidence", () => {
       claimIds: [claim.claim.id],
       artifactIds: [registered.artifact.id],
     })
+    await execute("git", ["-C", root, "add", "results.csv", ".gitignore"])
+    await execute("git", ["-C", root, "commit", "-qm", "Add verified result"])
+    const commit = (await execute("git", ["-C", root, "rev-parse", "HEAD"])).stdout.trim()
+    const promoted = await ResearchFoundationService.promote({
+      projectRoot: root,
+      expectedGitCommit: commit,
+      environmentTrackId: current.iteration.trackId,
+      artifactIds: [registered.artifact.id],
+      integrationIds: [integration.integration.id],
+      actor,
+      role: "owner",
+      signer,
+      idempotencyKey: "foundation-integrity-result",
+    })
+    expect(promoted).toMatchObject({
+      foundation: {
+        gitCommit: commit,
+        artifactIds: [registered.artifact.id],
+        integrationIds: [integration.integration.id],
+      },
+      project: { activeFoundationId: promoted.foundation.id },
+      replayed: false,
+    })
+    const replayedFoundation = await ResearchFoundationService.promote({
+      projectRoot: root,
+      expectedGitCommit: commit,
+      environmentTrackId: current.iteration.trackId,
+      artifactIds: [registered.artifact.id],
+      integrationIds: [integration.integration.id],
+      actor,
+      role: "owner",
+      signer,
+      idempotencyKey: "foundation-integrity-result",
+    })
+    expect(replayedFoundation).toMatchObject({ foundation: { id: promoted.foundation.id }, replayed: true })
 
     await writeFile(result, "metric,value\naccuracy,0.99\n")
     expect(await ResearchEvidenceService.verifyArtifacts(root)).toMatchObject([
       { artifact: { id: registered.artifact.id }, valid: false },
     ])
+    expect(await ResearchAudit.inspectScientific(root)).toMatchObject({
+      valid: false,
+      diagnostics: expect.arrayContaining([
+        expect.objectContaining({ code: "artifact_hash_mismatch", file: registered.artifact.id }),
+      ]),
+    })
   })
 
   it("rejects artifact paths outside the project", async () => {
