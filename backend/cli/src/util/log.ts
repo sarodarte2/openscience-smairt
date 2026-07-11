@@ -57,6 +57,7 @@ export namespace Log {
 
   export async function init(options: Options) {
     if (options.level) level = options.level
+    await fs.mkdir(Global.Path.log, { recursive: true, mode: 0o700 })
     cleanup(Global.Path.log)
     if (options.print) return
     logpath = path.join(
@@ -64,7 +65,10 @@ export namespace Log {
       options.dev ? "dev.log" : new Date().toISOString().split(".")[0].replace(/:/g, "") + ".log",
     )
     const logfile = Bun.file(logpath)
-    await fs.truncate(logpath).catch(() => {})
+    // Materialize the target before asking Bun for a streaming writer. Bun's
+    // writer can otherwise surface an opaque NUL-filled EPERM path when the
+    // log directory/file is created concurrently during a first source run.
+    await fs.writeFile(logpath, "", { encoding: "utf8", mode: 0o600 })
     const writer = logfile.writer()
     write = async (msg: any) => {
       const num = writer.write(msg)
