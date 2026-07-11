@@ -9,6 +9,9 @@
 - Clean-kernel notebook and hidden-state tests.
 - Hono route, CLI JSON, generated SDK and agent-tool parity.
 - Solid component and Playwright golden journeys.
+- First-run tests that distinguish folder opening, research initialization, and model generation, including missing-key,
+  offline, timeout, cancellation, restart, and source-build launch cases.
+- Provider setup tests for BYOK, local OpenAI-compatible endpoints, optional managed services, and connector discovery.
 - Keyboard, screen-reader, reduced-motion and WCAG checks.
 - Agent evals for track selection, tools, approvals, bounded retry, evidence citations and handoff.
 - Security tests for path traversal, symlink escape, argv injection, forged approvals and secret leakage.
@@ -38,6 +41,12 @@
 - No AI output becomes a signed scientific decision.
 - macOS/Linux clean-install golden paths pass.
 - Atlas may be absent.
+- A clean user can configure a model/provider/key or local endpoint from the GUI before generation; missing configuration
+  produces no indefinite "Generating" state.
+- Atlas-off/BYOK/local journeys show no credit-purchase prompt in their primary path.
+- Source mode and packaged mode both launch the intended project and show correct executable-specific permission help.
+- The researcher golden journey passes visual-regression, reduced-motion, reduced-transparency, keyboard, zoom, and
+  contrast gates.
 - No unresolved critical/high integrity, privacy, or execution finding remains.
 
 ## Traceability
