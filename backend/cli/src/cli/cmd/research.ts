@@ -11,6 +11,7 @@ import { ResearchRunService } from "../../research/application/run"
 import { ResearchEnvironmentService } from "../../research/application/environment"
 import { ResearchEvidenceService } from "../../research/application/evidence"
 import { ResearchReviewService } from "../../research/application/review"
+import { ResearchFoundationService } from "../../research/application/foundation"
 import { ProjectMembership } from "../../research/application/membership"
 import { ResearchProject } from "../../research/domain/schema"
 import { readFile } from "node:fs/promises"
@@ -94,15 +95,17 @@ const ResearchVerifyCommand = cmd({
       .option("format", { choices: ["text", "json"] as const, default: "text" }),
   async handler(args) {
     const root = (await LocalGit.inspect(path.resolve(args.directory as string))).root
-    const ledger = await ResearchAudit.inspect(root)
-    output(args.format as Format, ledger, () => {
-      if (!ledger.readOnly) {
-        prompts.log.success(`Verified ${ledger.events.length} signed research events`)
+    const [ledger, scientific] = await Promise.all([ResearchAudit.inspect(root), ResearchAudit.inspectScientific(root)])
+    const result = { ledger, scientific }
+    output(args.format as Format, result, () => {
+      if (!ledger.readOnly && scientific.valid) {
+        prompts.log.success(`Verified ${ledger.events.length} signed research events and scientific projections`)
         return
       }
       for (const diagnostic of ledger.diagnostics) prompts.log.error(`${diagnostic.code}: ${diagnostic.file}`)
+      for (const diagnostic of scientific.diagnostics) prompts.log.error(`${diagnostic.code}: ${diagnostic.file}`)
     })
-    if (!ledger.readOnly) return
+    if (!ledger.readOnly && scientific.valid) return
     process.exitCode = 2
   },
 })
@@ -501,6 +504,7 @@ const ResearchArtifactRegisterCommand = cmd({
       })
       .option("media-type", { type: "string", demandOption: true })
       .option("run", { type: "string" })
+      .option("idempotency-key", { type: "string", describe: "reuse this key when retrying the same mutation" })
       .option("format", { choices: ["text", "json"] as const, default: "text" }),
   async handler(args) {
     const { git } = await current(args.directory as string)
@@ -526,6 +530,7 @@ const ResearchArtifactRegisterCommand = cmd({
       actor: { kind: "human", id: member.id, displayName: member.displayName },
       role: member.role,
       signer,
+      idempotencyKey: (args.idempotencyKey as string | undefined) ?? crypto.randomUUID(),
     })
     output(args.format as Format, result, () => {
       prompts.log.success(`Registered ${result.artifact.path} (${result.artifact.id})`)
@@ -598,6 +603,7 @@ const ResearchAnalysisCreateCommand = cmd({
       .option("run", { type: "string", array: true, default: [] })
       .option("artifact", { type: "string", array: true, default: [] })
       .option("finalize", { type: "boolean", default: false })
+      .option("idempotency-key", { type: "string", describe: "reuse this key when retrying the same mutation" })
       .option("format", { choices: ["text", "json"] as const, default: "text" }),
   async handler(args) {
     const { git } = await current(args.directory as string)
@@ -618,6 +624,7 @@ const ResearchAnalysisCreateCommand = cmd({
       actor: { kind: "human", id: member.id, displayName: member.displayName },
       role: member.role,
       signer,
+      idempotencyKey: (args.idempotencyKey as string | undefined) ?? crypto.randomUUID(),
     })
     output(args.format as Format, result, () =>
       prompts.log.success(`${result.analysis.state} analysis ${result.analysis.id}`),
@@ -646,6 +653,7 @@ const ResearchClaimCreateCommand = cmd({
       .option("artifact", { type: "string", array: true, default: [] })
       .option("finalize", { type: "boolean", default: false })
       .option("yes", { type: "boolean", default: false })
+      .option("idempotency-key", { type: "string", describe: "reuse this key when retrying the same mutation" })
       .option("format", { choices: ["text", "json"] as const, default: "text" }),
   async handler(args) {
     if (args.finalize && !args.yes) throw new Error("Finalizing a scientific claim requires --yes after human review")
@@ -665,6 +673,7 @@ const ResearchClaimCreateCommand = cmd({
       actor: { kind: "human", id: member.id, displayName: member.displayName },
       role: member.role,
       signer,
+      idempotencyKey: (args.idempotencyKey as string | undefined) ?? crypto.randomUUID(),
     })
     output(args.format as Format, result, () => prompts.log.success(`${result.claim.state} claim ${result.claim.id}`))
   },
@@ -692,6 +701,7 @@ const ResearchReviewTrackCommand = cmd({
       })
       .option("rationale", { type: "string", demandOption: true })
       .option("yes", { type: "boolean", default: false })
+      .option("idempotency-key", { type: "string", describe: "reuse this key when retrying the same mutation" })
       .option("format", { choices: ["text", "json"] as const, default: "text" }),
   async handler(args) {
     if (!args.yes) throw new Error("Track review requires --yes after human review")
@@ -709,6 +719,7 @@ const ResearchReviewTrackCommand = cmd({
       actor: { kind: "human", id: member.id, displayName: member.displayName },
       role: member.role,
       signer,
+      idempotencyKey: (args.idempotencyKey as string | undefined) ?? crypto.randomUUID(),
     })
     output(args.format as Format, result, () =>
       prompts.log.success(`${result.review.outcome} review ${result.review.id}`),
@@ -731,6 +742,7 @@ const ResearchIntegrateEvidenceCommand = cmd({
       .positional("directory", { type: "string", default: process.cwd() })
       .option("review", { type: "string", demandOption: true })
       .option("yes", { type: "boolean", default: false })
+      .option("idempotency-key", { type: "string", describe: "reuse this key when retrying the same mutation" })
       .option("format", { choices: ["text", "json"] as const, default: "text" }),
   async handler(args) {
     if (!args.yes) throw new Error("Evidence integration requires --yes after human review")
@@ -744,6 +756,7 @@ const ResearchIntegrateEvidenceCommand = cmd({
       actor: { kind: "human", id: member.id, displayName: member.displayName },
       role: member.role,
       signer,
+      idempotencyKey: (args.idempotencyKey as string | undefined) ?? crypto.randomUUID(),
     })
     output(args.format as Format, result, () =>
       prompts.log.success(`Integrated evidence bundle ${result.integration.id}; source code unchanged`),
@@ -755,6 +768,74 @@ const ResearchIntegrateCommand = cmd({
   command: "integrate",
   describe: "separate evidence integration from code and foundation decisions",
   builder: (yargs) => yargs.command(ResearchIntegrateEvidenceCommand).demandCommand(),
+  async handler() {},
+})
+
+const ResearchFoundationListCommand = cmd({
+  command: "list [directory]",
+  describe: "list explicit foundation revisions",
+  builder: (yargs) =>
+    yargs
+      .positional("directory", { type: "string", default: process.cwd() })
+      .option("format", { choices: ["text", "json"] as const, default: "text" }),
+  async handler(args) {
+    const { git } = await current(args.directory as string)
+    const values = await ResearchFoundationService.list(git.root)
+    output(args.format as Format, values, () => {
+      for (const value of values) prompts.log.info(`${value.gitCommit.slice(0, 12)} · ${value.id}`)
+    })
+  },
+})
+
+const ResearchFoundationPromoteCommand = cmd({
+  command: "promote [directory]",
+  describe: "promote a clean commit, environment, artifacts, and reviewed evidence as the foundation",
+  builder: (yargs) =>
+    yargs
+      .positional("directory", { type: "string", default: process.cwd() })
+      .option("commit", { type: "string", describe: "exact expected Git commit; defaults to current HEAD" })
+      .option("environment-track", { type: "string", demandOption: true })
+      .option("artifact", { type: "string", array: true, default: [] })
+      .option("integration", { type: "string", array: true, demandOption: true })
+      .option("event", { type: "string", array: true, default: [] })
+      .option("idempotency-key", { type: "string" })
+      .option("yes", { type: "boolean", default: false })
+      .option("format", { choices: ["text", "json"] as const, default: "text" }),
+  async handler(args) {
+    if (!args.yes) {
+      throw new Error("Foundation promotion requires --yes after reviewing the exact commit and evidence bundle")
+    }
+    const { git } = await current(args.directory as string)
+    if (!git.commit) throw new Error("Foundation promotion requires a committed Git workspace")
+    const signer = await identity()
+    const member = await ProjectMembership.localMember(git.root, signer.keyId)
+    if (!member) throw new Error("The local signing identity is not an active project member")
+    const result = await ResearchFoundationService.promote({
+      projectRoot: git.root,
+      expectedGitCommit: (args.commit as string | undefined) ?? git.commit,
+      environmentTrackId: args.environmentTrack as string,
+      artifactIds: args.artifact as string[],
+      integrationIds: args.integration as string[],
+      supportingEventIds: args.event as string[],
+      actor: { kind: "human", id: member.id, displayName: member.displayName },
+      role: member.role,
+      signer,
+      idempotencyKey: (args.idempotencyKey as string | undefined) ?? crypto.randomUUID(),
+    })
+    output(args.format as Format, result, () => {
+      prompts.log.success(`Promoted foundation ${result.foundation.id}`)
+      prompts.log.info(
+        `Commit ${result.foundation.gitCommit} · environment ${result.foundation.environmentHash.slice(0, 12)}`,
+      )
+    })
+  },
+})
+
+const ResearchFoundationCommand = cmd({
+  command: "foundation",
+  describe: "manage explicit evidence-backed project baselines",
+  builder: (yargs) =>
+    yargs.command(ResearchFoundationListCommand).command(ResearchFoundationPromoteCommand).demandCommand(),
   async handler() {},
 })
 
@@ -775,6 +856,7 @@ export const ResearchCommand = cmd({
       .command(ResearchClaimCommand)
       .command(ResearchReviewCommand)
       .command(ResearchIntegrateCommand)
+      .command(ResearchFoundationCommand)
       .demandCommand(),
   async handler() {},
 })

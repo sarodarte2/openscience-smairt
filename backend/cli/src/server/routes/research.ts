@@ -26,6 +26,7 @@ import {
   ScientificClaim,
   TrackReview,
   EvidenceIntegration,
+  FoundationRevision,
   TrackEnvironment,
   WorkspaceBinding,
 } from "../../research/domain/schema"
@@ -39,6 +40,7 @@ import { NotebookValidationError, ResearchRunService, RunStateError } from "../.
 import { ResearchEnvironmentService } from "../../research/application/environment"
 import { ResearchEvidenceService } from "../../research/application/evidence"
 import { ResearchReviewService } from "../../research/application/review"
+import { ResearchFoundationService } from "../../research/application/foundation"
 
 const Status = z.discriminatedUnion("initialized", [
   z.object({ initialized: z.literal(false), root: z.string() }),
@@ -195,6 +197,16 @@ const IntegrateEvidence = z.object({
   humanConfirmed: z.literal(true),
 })
 
+const PromoteFoundation = z.object({
+  expectedGitCommit: z.string().regex(/^[0-9a-f]{40,64}$/),
+  environmentTrackId: z.string().min(1),
+  artifactIds: z.array(z.string()),
+  integrationIds: z.array(z.string()).min(1),
+  supportingEventIds: z.array(z.string()).default([]),
+  passphrase: z.string().min(12).optional(),
+  humanConfirmed: z.literal(true),
+})
+
 const IdempotencyHeader = z.object({
   "idempotency-key": z.string().min(8).max(200),
 })
@@ -319,6 +331,37 @@ export const ResearchRoutes = lazy(() =>
         const ledger = await ResearchAudit.inspect(Instance.directory)
         return c.json({ events: ledger.events, diagnostics: ledger.diagnostics, readOnly: ledger.readOnly })
       },
+    )
+    .get(
+      "/audits",
+      describeRoute({
+        summary: "Audit scientific projections, references, artifacts, and active foundation",
+        operationId: "research.audit",
+        responses: {
+          200: {
+            description: "Scientific integrity audit",
+            content: {
+              "application/json": {
+                schema: resolver(
+                  z.object({
+                    valid: z.boolean(),
+                    diagnostics: z.array(z.object({ code: z.string(), file: z.string(), message: z.string() })),
+                    counts: z.object({
+                      artifacts: z.number(),
+                      analyses: z.number(),
+                      claims: z.number(),
+                      reviews: z.number(),
+                      integrations: z.number(),
+                      foundations: z.number(),
+                    }),
+                  }),
+                ),
+              },
+            },
+          },
+        },
+      }),
+      async (c) => c.json(await ResearchAudit.inspectScientific(Instance.directory)),
     )
     .post(
       "/initialize",
@@ -893,29 +936,40 @@ export const ResearchRoutes = lazy(() =>
           200: {
             description: "Signed artifact manifest",
             content: {
-              "application/json": { schema: resolver(z.object({ artifact: ArtifactManifest, eventId: z.string() })) },
+              "application/json": {
+                schema: resolver(z.object({ artifact: ArtifactManifest, eventId: z.string(), replayed: z.boolean() })),
+              },
             },
           },
         },
       }),
+      validator("header", IdempotencyHeader),
       validator("json", RegisterArtifact),
       async (c) => {
         const body = c.req.valid("json")
-        const signer = await LocalIdentity.loadOrCreate({ passphrase: body.passphrase })
-        const member = await ProjectMembership.localMember(Instance.directory, signer.keyId)
-        if (!member)
-          throw new HTTPException(403, { message: "The local signing identity is not an active project member" })
-        const result = await ResearchEvidenceService.registerArtifact({
-          projectRoot: Instance.directory,
-          iterationId: body.iterationId,
-          file: body.file,
-          artifactRole: body.role,
-          mediaType: body.mediaType,
-          runId: body.runId,
-          actor: { kind: "human", id: member.id, displayName: member.displayName },
-          role: member.role,
-          signer,
-        })
+        const idempotencyKey = c.req.valid("header")["idempotency-key"]
+        const project = await researchProject(Instance.directory)
+        const result = await operation(
+          { operationId: idempotencyKey, projectId: project.id, kind: "research.artifact.register" },
+          async () => {
+            const signer = await LocalIdentity.loadOrCreate({ passphrase: body.passphrase })
+            const member = await ProjectMembership.localMember(Instance.directory, signer.keyId)
+            if (!member)
+              throw new HTTPException(403, { message: "The local signing identity is not an active project member" })
+            return ResearchEvidenceService.registerArtifact({
+              projectRoot: Instance.directory,
+              iterationId: body.iterationId,
+              file: body.file,
+              artifactRole: body.role,
+              mediaType: body.mediaType,
+              runId: body.runId,
+              actor: { kind: "human", id: member.id, displayName: member.displayName },
+              role: member.role,
+              signer,
+              idempotencyKey,
+            })
+          },
+        )
         await Bus.publish(ResearchEvents.EvidenceUpdated, {
           version: 1,
           projectId: result.artifact.projectId,
@@ -923,7 +977,7 @@ export const ResearchRoutes = lazy(() =>
           subjectId: result.artifact.id,
           eventId: result.eventId,
           action: "registered",
-          replayed: false,
+          replayed: result.replayed,
         })
         return c.json(result)
       },
@@ -953,25 +1007,38 @@ export const ResearchRoutes = lazy(() =>
           200: {
             description: "Signed analysis",
             content: {
-              "application/json": { schema: resolver(z.object({ analysis: ScientificAnalysis, eventId: z.string() })) },
+              "application/json": {
+                schema: resolver(
+                  z.object({ analysis: ScientificAnalysis, eventId: z.string(), replayed: z.boolean() }),
+                ),
+              },
             },
           },
         },
       }),
+      validator("header", IdempotencyHeader),
       validator("json", CreateAnalysis),
       async (c) => {
         const body = c.req.valid("json")
-        const signer = await LocalIdentity.loadOrCreate({ passphrase: body.passphrase })
-        const member = await ProjectMembership.localMember(Instance.directory, signer.keyId)
-        if (!member)
-          throw new HTTPException(403, { message: "The local signing identity is not an active project member" })
-        const result = await ResearchEvidenceService.createAnalysis({
-          ...body,
-          projectRoot: Instance.directory,
-          actor: { kind: "human", id: member.id, displayName: member.displayName },
-          role: member.role,
-          signer,
-        })
+        const idempotencyKey = c.req.valid("header")["idempotency-key"]
+        const project = await researchProject(Instance.directory)
+        const result = await operation(
+          { operationId: idempotencyKey, projectId: project.id, kind: "research.analysis.create" },
+          async () => {
+            const signer = await LocalIdentity.loadOrCreate({ passphrase: body.passphrase })
+            const member = await ProjectMembership.localMember(Instance.directory, signer.keyId)
+            if (!member)
+              throw new HTTPException(403, { message: "The local signing identity is not an active project member" })
+            return ResearchEvidenceService.createAnalysis({
+              ...body,
+              projectRoot: Instance.directory,
+              actor: { kind: "human", id: member.id, displayName: member.displayName },
+              role: member.role,
+              signer,
+              idempotencyKey,
+            })
+          },
+        )
         await Bus.publish(ResearchEvents.EvidenceUpdated, {
           version: 1,
           projectId: result.analysis.projectId,
@@ -979,7 +1046,7 @@ export const ResearchRoutes = lazy(() =>
           subjectId: result.analysis.id,
           eventId: result.eventId,
           action: result.analysis.state === "finalized" ? "finalized" : "created",
-          replayed: false,
+          replayed: result.replayed,
         })
         return c.json(result)
       },
@@ -1008,26 +1075,39 @@ export const ResearchRoutes = lazy(() =>
           200: {
             description: "Signed claim",
             content: {
-              "application/json": { schema: resolver(z.object({ claim: ScientificClaim, eventId: z.string() })) },
+              "application/json": {
+                schema: resolver(z.object({ claim: ScientificClaim, eventId: z.string(), replayed: z.boolean() })),
+              },
             },
           },
         },
       }),
+      validator("header", IdempotencyHeader),
       validator("json", CreateClaim),
       async (c) => {
         const body = c.req.valid("json")
-        const signer = await LocalIdentity.loadOrCreate({ passphrase: body.passphrase })
-        const member = await ProjectMembership.localMember(Instance.directory, signer.keyId)
-        if (!member)
-          throw new HTTPException(403, { message: "The local signing identity is not an active project member" })
+        const idempotencyKey = c.req.valid("header")["idempotency-key"]
+        const project = await researchProject(Instance.directory)
         return c.json(
-          await ResearchReviewService.createClaim({
-            ...body,
-            projectRoot: Instance.directory,
-            actor: { kind: "human", id: member.id, displayName: member.displayName },
-            role: member.role,
-            signer,
-          }),
+          await operation(
+            { operationId: idempotencyKey, projectId: project.id, kind: "research.claim.create" },
+            async () => {
+              const signer = await LocalIdentity.loadOrCreate({ passphrase: body.passphrase })
+              const member = await ProjectMembership.localMember(Instance.directory, signer.keyId)
+              if (!member)
+                throw new HTTPException(403, {
+                  message: "The local signing identity is not an active project member",
+                })
+              return ResearchReviewService.createClaim({
+                ...body,
+                projectRoot: Instance.directory,
+                actor: { kind: "human", id: member.id, displayName: member.displayName },
+                role: member.role,
+                signer,
+                idempotencyKey,
+              })
+            },
+          ),
         )
       },
     )
@@ -1056,27 +1136,40 @@ export const ResearchRoutes = lazy(() =>
             description: "Signed review decision",
             content: {
               "application/json": {
-                schema: resolver(z.object({ review: TrackReview, track: ResearchTrack, eventId: z.string() })),
+                schema: resolver(
+                  z.object({ review: TrackReview, track: ResearchTrack, eventId: z.string(), replayed: z.boolean() }),
+                ),
               },
             },
           },
         },
       }),
+      validator("header", IdempotencyHeader),
       validator("json", ReviewTrack),
       async (c) => {
         const body = c.req.valid("json")
-        const signer = await LocalIdentity.loadOrCreate({ passphrase: body.passphrase })
-        const member = await ProjectMembership.localMember(Instance.directory, signer.keyId)
-        if (!member)
-          throw new HTTPException(403, { message: "The local signing identity is not an active project member" })
+        const idempotencyKey = c.req.valid("header")["idempotency-key"]
+        const project = await researchProject(Instance.directory)
         return c.json(
-          await ResearchReviewService.reviewTrack({
-            ...body,
-            projectRoot: Instance.directory,
-            actor: { kind: "human", id: member.id, displayName: member.displayName },
-            role: member.role,
-            signer,
-          }),
+          await operation(
+            { operationId: idempotencyKey, projectId: project.id, kind: "research.review.create" },
+            async () => {
+              const signer = await LocalIdentity.loadOrCreate({ passphrase: body.passphrase })
+              const member = await ProjectMembership.localMember(Instance.directory, signer.keyId)
+              if (!member)
+                throw new HTTPException(403, {
+                  message: "The local signing identity is not an active project member",
+                })
+              return ResearchReviewService.reviewTrack({
+                ...body,
+                projectRoot: Instance.directory,
+                actor: { kind: "human", id: member.id, displayName: member.displayName },
+                role: member.role,
+                signer,
+                idempotencyKey,
+              })
+            },
+          ),
         )
       },
     )
@@ -1106,28 +1199,147 @@ export const ResearchRoutes = lazy(() =>
             description: "Signed evidence-only integration",
             content: {
               "application/json": {
-                schema: resolver(z.object({ integration: EvidenceIntegration, eventId: z.string() })),
+                schema: resolver(
+                  z.object({ integration: EvidenceIntegration, eventId: z.string(), replayed: z.boolean() }),
+                ),
               },
             },
           },
         },
       }),
+      validator("header", IdempotencyHeader),
       validator("json", IntegrateEvidence),
       async (c) => {
         const body = c.req.valid("json")
-        const signer = await LocalIdentity.loadOrCreate({ passphrase: body.passphrase })
-        const member = await ProjectMembership.localMember(Instance.directory, signer.keyId)
-        if (!member)
-          throw new HTTPException(403, { message: "The local signing identity is not an active project member" })
+        const idempotencyKey = c.req.valid("header")["idempotency-key"]
+        const project = await researchProject(Instance.directory)
         return c.json(
-          await ResearchReviewService.integrateEvidenceOnly({
-            projectRoot: Instance.directory,
-            reviewId: body.reviewId,
-            actor: { kind: "human", id: member.id, displayName: member.displayName },
-            role: member.role,
-            signer,
-          }),
+          await operation(
+            { operationId: idempotencyKey, projectId: project.id, kind: "research.integration.evidence" },
+            async () => {
+              const signer = await LocalIdentity.loadOrCreate({ passphrase: body.passphrase })
+              const member = await ProjectMembership.localMember(Instance.directory, signer.keyId)
+              if (!member)
+                throw new HTTPException(403, {
+                  message: "The local signing identity is not an active project member",
+                })
+              return ResearchReviewService.integrateEvidenceOnly({
+                projectRoot: Instance.directory,
+                reviewId: body.reviewId,
+                actor: { kind: "human", id: member.id, displayName: member.displayName },
+                role: member.role,
+                signer,
+                idempotencyKey,
+              })
+            },
+          ),
         )
+      },
+    )
+    .get(
+      "/foundations/preview",
+      describeRoute({
+        summary: "Preview the exact commit, environments, integrations, and artifacts eligible for promotion",
+        operationId: "research.foundation.preview",
+        responses: {
+          200: {
+            description: "Foundation promotion preview",
+            content: {
+              "application/json": {
+                schema: resolver(
+                  z.object({
+                    projectId: z.string(),
+                    activeFoundationId: z.string().nullable(),
+                    git: z.object({
+                      commit: z.string().nullable(),
+                      branch: z.string(),
+                      dirty: z.boolean(),
+                      codeSnapshotHash: z.string(),
+                    }),
+                    environments: z.array(TrackEnvironment),
+                    integrations: z.array(EvidenceIntegration),
+                    artifacts: z.array(ArtifactManifest.extend({ integrityValid: z.boolean() })),
+                    ready: z.boolean(),
+                  }),
+                ),
+              },
+            },
+          },
+        },
+      }),
+      async (c) => c.json(await ResearchFoundationService.preview(Instance.directory)),
+    )
+    .get(
+      "/foundations",
+      describeRoute({
+        summary: "List explicit foundation revisions",
+        operationId: "research.foundation.list",
+        responses: {
+          200: {
+            description: "Foundation revisions",
+            content: { "application/json": { schema: resolver(z.array(FoundationRevision)) } },
+          },
+        },
+      }),
+      async (c) => c.json(await ResearchFoundationService.list(Instance.directory)),
+    )
+    .post(
+      "/foundations/promote",
+      describeRoute({
+        summary: "Promote an exact clean commit, environment, artifacts, and evidence decisions",
+        operationId: "research.foundation.promote",
+        responses: {
+          200: {
+            description: "Promoted foundation revision",
+            content: {
+              "application/json": {
+                schema: resolver(
+                  z.object({
+                    foundation: FoundationRevision,
+                    project: ResearchProject,
+                    eventId: z.string(),
+                    replayed: z.boolean(),
+                  }),
+                ),
+              },
+            },
+          },
+          403: { description: "Only an authorized human owner may promote a foundation" },
+          409: { description: "Workspace, integrity, evidence, or idempotency conflict" },
+        },
+      }),
+      validator("header", IdempotencyHeader),
+      validator("json", PromoteFoundation),
+      async (c) => {
+        const body = c.req.valid("json")
+        const idempotencyKey = c.req.valid("header")["idempotency-key"]
+        const project = await researchProject(Instance.directory)
+        const result = await operation(
+          { operationId: idempotencyKey, projectId: project.id, kind: "research.foundation.promote" },
+          async () => {
+            const signer = await LocalIdentity.loadOrCreate({ passphrase: body.passphrase })
+            const member = await ProjectMembership.localMember(Instance.directory, signer.keyId)
+            if (!member)
+              throw new HTTPException(403, { message: "The local signing identity is not an active project member" })
+            return ResearchFoundationService.promote({
+              ...body,
+              projectRoot: Instance.directory,
+              actor: { kind: "human", id: member.id, displayName: member.displayName },
+              role: member.role,
+              signer,
+              idempotencyKey,
+            })
+          },
+        )
+        await Bus.publish(ResearchEvents.FoundationUpdated, {
+          version: 1,
+          projectId: result.project.id,
+          foundationId: result.foundation.id,
+          eventId: result.eventId,
+          action: "promoted",
+          replayed: result.replayed,
+        })
+        return c.json(result)
       },
     ),
 )

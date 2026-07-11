@@ -734,6 +734,18 @@ export type EventResearchEvidenceUpdated = {
   }
 }
 
+export type EventResearchFoundationUpdated = {
+  type: "research.foundation.updated"
+  properties: {
+    version: 1
+    projectId: string
+    foundationId: string
+    eventId: string
+    action: "promoted"
+    replayed: boolean
+  }
+}
+
 export type EventResearchApprovalRequested = {
   type: "research.approval.requested"
   properties: {
@@ -950,6 +962,7 @@ export type Event =
   | EventResearchIterationUpdated
   | EventResearchRunUpdated
   | EventResearchEvidenceUpdated
+  | EventResearchFoundationUpdated
   | EventResearchApprovalRequested
   | EventResearchAuditUpdated
   | EventMcpToolsChanged
@@ -5928,6 +5941,39 @@ export type ResearchLedgerResponses = {
 
 export type ResearchLedgerResponse = ResearchLedgerResponses[keyof ResearchLedgerResponses]
 
+export type ResearchAuditData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+  }
+  url: "/research/audits"
+}
+
+export type ResearchAuditResponses = {
+  /**
+   * Scientific integrity audit
+   */
+  200: {
+    valid: boolean
+    diagnostics: Array<{
+      code: string
+      file: string
+      message: string
+    }>
+    counts: {
+      artifacts: number
+      analyses: number
+      claims: number
+      reviews: number
+      integrations: number
+      foundations: number
+    }
+  }
+}
+
+export type ResearchAuditResponse = ResearchAuditResponses[keyof ResearchAuditResponses]
+
 export type ResearchInitializeData = {
   body?: {
     name: string
@@ -7118,6 +7164,9 @@ export type ResearchArtifactRegisterData = {
     passphrase?: string
     humanConfirmed: true
   }
+  headers: {
+    "idempotency-key": string
+  }
   path?: never
   query?: {
     directory?: string
@@ -7151,6 +7200,7 @@ export type ResearchArtifactRegisterResponses = {
       captureConfidence: "complete" | "best_effort"
     }
     eventId: string
+    replayed: boolean
   }
 }
 
@@ -7211,6 +7261,9 @@ export type ResearchAnalysisCreateData = {
     passphrase?: string
     humanConfirmed: true
   }
+  headers: {
+    "idempotency-key": string
+  }
   path?: never
   query?: {
     directory?: string
@@ -7246,6 +7299,7 @@ export type ResearchAnalysisCreateResponses = {
       finalizedAt: string | null
     }
     eventId: string
+    replayed: boolean
   }
 }
 
@@ -7301,6 +7355,9 @@ export type ResearchClaimCreateData = {
     passphrase?: string
     humanConfirmed: true
   }
+  headers: {
+    "idempotency-key": string
+  }
   path?: never
   query?: {
     directory?: string
@@ -7334,6 +7391,7 @@ export type ResearchClaimCreateResponses = {
       finalizedAt: string | null
     }
     eventId: string
+    replayed: boolean
   }
 }
 
@@ -7384,6 +7442,9 @@ export type ResearchReviewCreateData = {
     rationale: string
     passphrase?: string
     humanConfirmed: true
+  }
+  headers: {
+    "idempotency-key": string
   }
   path?: never
   query?: {
@@ -7444,6 +7505,7 @@ export type ResearchReviewCreateResponses = {
       supersedesTrackId?: string
     }
     eventId: string
+    replayed: boolean
   }
 }
 
@@ -7496,6 +7558,9 @@ export type ResearchIntegrationEvidenceData = {
     passphrase?: string
     humanConfirmed: true
   }
+  headers: {
+    "idempotency-key": string
+  }
   path?: never
   query?: {
     directory?: string
@@ -7532,11 +7597,226 @@ export type ResearchIntegrationEvidenceResponses = {
       bundleHash: string
     }
     eventId: string
+    replayed: boolean
   }
 }
 
 export type ResearchIntegrationEvidenceResponse =
   ResearchIntegrationEvidenceResponses[keyof ResearchIntegrationEvidenceResponses]
+
+export type ResearchFoundationPreviewData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+  }
+  url: "/research/foundations/preview"
+}
+
+export type ResearchFoundationPreviewResponses = {
+  /**
+   * Foundation promotion preview
+   */
+  200: {
+    projectId: string
+    activeFoundationId: string | null
+    git: {
+      commit: string | null
+      branch: string
+      dirty: boolean
+      codeSnapshotHash: string
+    }
+    environments: Array<{
+      schemaVersion: 1
+      projectId: string
+      createdAt: string
+      createdBy: {
+        kind: "human" | "agent" | "system"
+        id: string
+        displayName: string
+        delegationId?: string
+      }
+      trackId: string
+      kind: "conda"
+      name: string
+      portableSpecPath: string
+      portableSpecHash: string
+      state: "base" | "inherited" | "diverged"
+      inheritedFromTrackId: string | null
+    }>
+    integrations: Array<{
+      schemaVersion: 1
+      projectId: string
+      createdAt: string
+      createdBy: {
+        kind: "human" | "agent" | "system"
+        id: string
+        displayName: string
+        delegationId?: string
+      }
+      id: string
+      sourceTrackId: string
+      reviewId: string
+      mode: "evidence_only"
+      sourceBranch: string
+      sourceCommit: string | null
+      baseFoundationId: string | null
+      claimIds: Array<string>
+      analysisIds: Array<string>
+      artifactIds: Array<string>
+      supportingEventIds: Array<string>
+      bundleHash: string
+    }>
+    artifacts: Array<{
+      schemaVersion: 1
+      projectId: string
+      createdAt: string
+      createdBy: {
+        kind: "human" | "agent" | "system"
+        id: string
+        displayName: string
+        delegationId?: string
+      }
+      id: string
+      iterationId: string
+      runId: string | null
+      path: string
+      role: "input" | "output" | "dataset" | "model" | "figure" | "table" | "notebook" | "log" | "other"
+      mediaType: string
+      byteLength: number
+      contentHash: string
+      captureConfidence: "complete" | "best_effort"
+      integrityValid: boolean
+    }>
+    ready: boolean
+  }
+}
+
+export type ResearchFoundationPreviewResponse =
+  ResearchFoundationPreviewResponses[keyof ResearchFoundationPreviewResponses]
+
+export type ResearchFoundationListData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+  }
+  url: "/research/foundations"
+}
+
+export type ResearchFoundationListResponses = {
+  /**
+   * Foundation revisions
+   */
+  200: Array<{
+    schemaVersion: 1
+    projectId: string
+    createdAt: string
+    createdBy: {
+      kind: "human" | "agent" | "system"
+      id: string
+      displayName: string
+      delegationId?: string
+    }
+    id: string
+    parentFoundationId: string | null
+    gitCommit: string
+    codeSnapshotHash: string
+    environmentHash: string
+    environmentSpecPath: string
+    artifactIds: Array<string>
+    integrationIds: Array<string>
+    supportingEventIds: Array<string>
+    promotedByEventId: string
+  }>
+}
+
+export type ResearchFoundationListResponse = ResearchFoundationListResponses[keyof ResearchFoundationListResponses]
+
+export type ResearchFoundationPromoteData = {
+  body?: {
+    expectedGitCommit: string
+    environmentTrackId: string
+    artifactIds: Array<string>
+    integrationIds: Array<string>
+    supportingEventIds?: Array<string>
+    passphrase?: string
+    humanConfirmed: true
+  }
+  headers: {
+    "idempotency-key": string
+  }
+  path?: never
+  query?: {
+    directory?: string
+  }
+  url: "/research/foundations/promote"
+}
+
+export type ResearchFoundationPromoteErrors = {
+  /**
+   * Only an authorized human owner may promote a foundation
+   */
+  403: unknown
+  /**
+   * Workspace, integrity, evidence, or idempotency conflict
+   */
+  409: unknown
+}
+
+export type ResearchFoundationPromoteResponses = {
+  /**
+   * Promoted foundation revision
+   */
+  200: {
+    foundation: {
+      schemaVersion: 1
+      projectId: string
+      createdAt: string
+      createdBy: {
+        kind: "human" | "agent" | "system"
+        id: string
+        displayName: string
+        delegationId?: string
+      }
+      id: string
+      parentFoundationId: string | null
+      gitCommit: string
+      codeSnapshotHash: string
+      environmentHash: string
+      environmentSpecPath: string
+      artifactIds: Array<string>
+      integrationIds: Array<string>
+      supportingEventIds: Array<string>
+      promotedByEventId: string
+    }
+    project: {
+      schemaVersion: 1
+      projectId: string
+      createdAt: string
+      createdBy: {
+        kind: "human" | "agent" | "system"
+        id: string
+        displayName: string
+        delegationId?: string
+      }
+      id: string
+      name: string
+      description?: string
+      defaultEnvironment: {
+        kind: "conda"
+        name: string
+      }
+      coreTrackId: string
+      activeFoundationId: string | null
+    }
+    eventId: string
+    replayed: boolean
+  }
+}
+
+export type ResearchFoundationPromoteResponse =
+  ResearchFoundationPromoteResponses[keyof ResearchFoundationPromoteResponses]
 
 export type InstanceDisposeData = {
   body?: never

@@ -104,6 +104,8 @@ packets:
     depends_on: [WP-07-API]
     owns:
       - frontend/workspace/src/thesis/ResearchPanel.tsx
+      - frontend/workspace/src/thesis/EvidencePanel.tsx
+      - frontend/workspace/src/thesis/DecisionPanel.tsx
       - frontend/workspace/e2e/research*.spec.ts
     outputs:
       - integrated-research-workspace
@@ -115,13 +117,14 @@ packets:
     owns:
       - backend/cli/src/research/application/evidence.ts
       - backend/cli/src/research/application/review.ts
+      - backend/cli/src/research/application/foundation.ts
       - backend/cli/src/research/__tests__/evidence.test.ts
     outputs:
       - evidence-bundles
       - foundation-promotion
 
   WP-10-TRUST:
-    status: pending
+    status: partial
     spec: "09"
     depends_on: [WP-05-RUNNER, WP-09-INTEGRATE]
     owns:

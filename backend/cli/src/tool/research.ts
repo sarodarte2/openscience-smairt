@@ -9,6 +9,9 @@ import { ResearchTrackService } from "../research/application/track"
 import { InvestigationService } from "../research/application/investigation"
 import { ResearchRunService } from "../research/application/run"
 import { ResearchEnvironmentService } from "../research/application/environment"
+import { ResearchEvidenceService } from "../research/application/evidence"
+import { ResearchReviewService } from "../research/application/review"
+import { ResearchFoundationService } from "../research/application/foundation"
 import { ResearchCapability } from "../research/domain/governance"
 import { Json, ProtocolContent, ResearchProject } from "../research/domain/schema"
 import { LocalIdentity } from "../research/adapters/identity/local"
@@ -29,13 +32,33 @@ export const ResearchContextTool = Tool.define("research_context", {
   ].join(" "),
   parameters: z.object({}),
   async execute() {
-    const [currentProject, tracks, currentIterations, protocols, runs, environments, audit] = await Promise.all([
+    const [
+      currentProject,
+      tracks,
+      currentIterations,
+      protocols,
+      runs,
+      environments,
+      artifacts,
+      analyses,
+      claims,
+      reviews,
+      integrations,
+      foundations,
+      audit,
+    ] = await Promise.all([
       project(),
       ResearchTrackService.list(Instance.directory),
       InvestigationService.listIterations(Instance.directory),
       InvestigationService.listProtocols(Instance.directory),
       ResearchRunService.list(Instance.directory),
       ResearchEnvironmentService.list(Instance.directory),
+      ResearchEvidenceService.listArtifacts(Instance.directory),
+      ResearchEvidenceService.listAnalyses(Instance.directory),
+      ResearchReviewService.listClaims(Instance.directory),
+      ResearchReviewService.listReviews(Instance.directory),
+      ResearchReviewService.listIntegrations(Instance.directory),
+      ResearchFoundationService.list(Instance.directory),
       ResearchAudit.inspect(Instance.directory),
     ])
     const visible = tracks.filter((track) => !track.hidden)
@@ -49,6 +72,12 @@ export const ResearchContextTool = Tool.define("research_context", {
           protocols,
           runs,
           environments,
+          artifacts,
+          analyses,
+          claims,
+          reviews,
+          integrations,
+          foundations,
           integrity: { readOnly: audit.readOnly, diagnostics: audit.diagnostics },
         },
         null,
@@ -61,6 +90,10 @@ export const ResearchContextTool = Tool.define("research_context", {
         protocolCount: protocols.length,
         runCount: runs.length,
         environmentCount: environments.length,
+        artifactCount: artifacts.length,
+        analysisCount: analyses.length,
+        claimCount: claims.length,
+        foundationCount: foundations.length,
         readOnly: audit.readOnly,
       },
     }

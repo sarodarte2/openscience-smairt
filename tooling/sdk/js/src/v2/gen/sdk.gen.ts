@@ -120,11 +120,16 @@ import type {
   ResearchAnalysisListResponses,
   ResearchArtifactListResponses,
   ResearchArtifactRegisterResponses,
+  ResearchAuditResponses,
   ResearchClaimCreateResponses,
   ResearchClaimListResponses,
   ResearchEnvironmentIsolateErrors,
   ResearchEnvironmentIsolateResponses,
   ResearchEnvironmentListResponses,
+  ResearchFoundationListResponses,
+  ResearchFoundationPreviewResponses,
+  ResearchFoundationPromoteErrors,
+  ResearchFoundationPromoteResponses,
   ResearchInitializeErrors,
   ResearchInitializeResponses,
   ResearchIntegrationEvidenceResponses,
@@ -4221,7 +4226,8 @@ export class Artifact extends HeyApiClient {
    * Hash and register a project-local artifact
    */
   public register<ThrowOnError extends boolean = false>(
-    parameters?: {
+    parameters: {
+      "idempotency-key": string
       directory?: string
       iterationId?: string
       file?: string
@@ -4238,6 +4244,7 @@ export class Artifact extends HeyApiClient {
       [
         {
           args: [
+            { in: "headers", key: "idempotency-key" },
             { in: "query", key: "directory" },
             { in: "body", key: "iterationId" },
             { in: "body", key: "file" },
@@ -4296,7 +4303,8 @@ export class Analysis extends HeyApiClient {
    * Create a traceable scientific analysis
    */
   public create<ThrowOnError extends boolean = false>(
-    parameters?: {
+    parameters: {
+      "idempotency-key": string
       directory?: string
       iterationId?: string
       title?: string
@@ -4317,6 +4325,7 @@ export class Analysis extends HeyApiClient {
       [
         {
           args: [
+            { in: "headers", key: "idempotency-key" },
             { in: "query", key: "directory" },
             { in: "body", key: "iterationId" },
             { in: "body", key: "title" },
@@ -4379,7 +4388,8 @@ export class Claim extends HeyApiClient {
    * Create or finalize an evidence-backed claim
    */
   public create<ThrowOnError extends boolean = false>(
-    parameters?: {
+    parameters: {
+      "idempotency-key": string
       directory?: string
       iterationId?: string
       statement?: string
@@ -4398,6 +4408,7 @@ export class Claim extends HeyApiClient {
       [
         {
           args: [
+            { in: "headers", key: "idempotency-key" },
             { in: "query", key: "directory" },
             { in: "body", key: "iterationId" },
             { in: "body", key: "statement" },
@@ -4458,7 +4469,8 @@ export class Review extends HeyApiClient {
    * Record an explicit human track review
    */
   public create<ThrowOnError extends boolean = false>(
-    parameters?: {
+    parameters: {
+      "idempotency-key": string
       directory?: string
       trackId?: string
       claimIds?: Array<string>
@@ -4475,6 +4487,7 @@ export class Review extends HeyApiClient {
       [
         {
           args: [
+            { in: "headers", key: "idempotency-key" },
             { in: "query", key: "directory" },
             { in: "body", key: "trackId" },
             { in: "body", key: "claimIds" },
@@ -4533,7 +4546,8 @@ export class Integration extends HeyApiClient {
    * Integrate reviewed evidence without changing code
    */
   public evidence<ThrowOnError extends boolean = false>(
-    parameters?: {
+    parameters: {
+      "idempotency-key": string
       directory?: string
       reviewId?: string
       passphrase?: string
@@ -4546,6 +4560,7 @@ export class Integration extends HeyApiClient {
       [
         {
           args: [
+            { in: "headers", key: "idempotency-key" },
             { in: "query", key: "directory" },
             { in: "body", key: "reviewId" },
             { in: "body", key: "passphrase" },
@@ -4556,6 +4571,93 @@ export class Integration extends HeyApiClient {
     )
     return (options?.client ?? this.client).post<ResearchIntegrationEvidenceResponses, unknown, ThrowOnError>({
       url: "/research/integrations/evidence",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+}
+
+export class Foundation extends HeyApiClient {
+  /**
+   * Preview the exact commit, environments, integrations, and artifacts eligible for promotion
+   */
+  public preview<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams([parameters], [{ args: [{ in: "query", key: "directory" }] }])
+    return (options?.client ?? this.client).get<ResearchFoundationPreviewResponses, unknown, ThrowOnError>({
+      url: "/research/foundations/preview",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * List explicit foundation revisions
+   */
+  public list<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams([parameters], [{ args: [{ in: "query", key: "directory" }] }])
+    return (options?.client ?? this.client).get<ResearchFoundationListResponses, unknown, ThrowOnError>({
+      url: "/research/foundations",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Promote an exact clean commit, environment, artifacts, and evidence decisions
+   */
+  public promote<ThrowOnError extends boolean = false>(
+    parameters: {
+      "idempotency-key": string
+      directory?: string
+      expectedGitCommit?: string
+      environmentTrackId?: string
+      artifactIds?: Array<string>
+      integrationIds?: Array<string>
+      supportingEventIds?: Array<string>
+      passphrase?: string
+      humanConfirmed?: true
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "headers", key: "idempotency-key" },
+            { in: "query", key: "directory" },
+            { in: "body", key: "expectedGitCommit" },
+            { in: "body", key: "environmentTrackId" },
+            { in: "body", key: "artifactIds" },
+            { in: "body", key: "integrationIds" },
+            { in: "body", key: "supportingEventIds" },
+            { in: "body", key: "passphrase" },
+            { in: "body", key: "humanConfirmed" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      ResearchFoundationPromoteResponses,
+      ResearchFoundationPromoteErrors,
+      ThrowOnError
+    >({
+      url: "/research/foundations/promote",
       ...options,
       ...params,
       headers: {
@@ -4597,6 +4699,23 @@ export class Research extends HeyApiClient {
     const params = buildClientParams([parameters], [{ args: [{ in: "query", key: "directory" }] }])
     return (options?.client ?? this.client).get<ResearchLedgerResponses, unknown, ThrowOnError>({
       url: "/research/ledger",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Audit scientific projections, references, artifacts, and active foundation
+   */
+  public audit<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams([parameters], [{ args: [{ in: "query", key: "directory" }] }])
+    return (options?.client ?? this.client).get<ResearchAuditResponses, unknown, ThrowOnError>({
+      url: "/research/audits",
       ...options,
       ...params,
     })
@@ -4691,6 +4810,11 @@ export class Research extends HeyApiClient {
   private _integration?: Integration
   get integration(): Integration {
     return (this._integration ??= new Integration({ client: this.client }))
+  }
+
+  private _foundation?: Foundation
+  get foundation(): Foundation {
+    return (this._foundation ??= new Foundation({ client: this.client }))
   }
 }
 

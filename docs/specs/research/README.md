@@ -49,24 +49,26 @@ The historical roadmap in `docs/plans/12-smairt-integration.md` remains useful s
 
 The first implementation slice is intentionally not a public-v1 claim. `partial` means executable code exists but the packet's complete acceptance suite or all declared outputs have not landed.
 
-| Contract                                                       | Implementation                                                          | Verification                                              |
-| -------------------------------------------------------------- | ----------------------------------------------------------------------- | --------------------------------------------------------- |
-| Stable project, track, iteration, protocol and run identities  | `backend/cli/src/research/domain`                                       | domain and project tests                                  |
-| Canonical hashes, Ed25519 signatures and file-per-event ledger | `domain/{canonical,event,signature}.ts`, `adapters/ledger`              | canonical, event and ledger tests; Node crypto smoke test |
-| Human/agent capability boundary                                | `domain/governance.ts`                                                  | governance tests; AI approval denial                      |
-| Existing-repository adoption, core track and Conda manifest    | `application/project.ts`, environment and identity adapters             | temporary-Git project test                                |
-| Track identity, workspace binding and environment inheritance  | `application/track.ts`, Git and Conda adapters                          | project test; explicit parent/environment assertions      |
-| Signed track environment isolation                             | `application/environment.ts`, CLI, API and researcher UI                | parent-preservation and idempotent divergence test        |
-| Mode-specific protocols and signed run intent                  | `application/investigation.ts`                                          | end-to-end domain flow in project test                    |
-| Captured Git/Conda formal run and argv-only execution          | `application/run.ts`, Git, Conda and process adapters                   | drift, redaction, replay and real-process tests           |
-| Clean-kernel formal notebook execution                         | run/process adapters and `FormalRunPanel.tsx`                           | original/executed copy and hash smoke test                |
-| Durable mutation replay and projection repair                  | ledger, track and investigation services                                | conflict, replay and interrupted-projection tests         |
-| Versioned research events and generated API client             | `research/events.ts`, research routes, `tooling/sdk`                    | OpenAPI generation and SDK typecheck                      |
-| Human-reviewed protocol freeze                                 | investigation service, CLI, API and `ProtocolReview.tsx`                | freeze/replay flow and human-only governance tests        |
-| Bounded agent research tools                                   | `tool/research.ts`, common governance                                   | context/track/iteration schemas; AI approval denial       |
-| Verifiable artifacts, analyses, claims and track review        | `application/{evidence,review}.ts`                                      | corruption localization and signed review flow            |
-| Evidence-only integration of negative or positive outcomes     | `application/review.ts`                                                 | inconclusive evidence bundle test; no code merge          |
-| Evidence, claim, review and integration API/CLI/SDK parity     | research routes, CLI and generated SDK                                  | backend and SDK typechecks; research suite                |
-| CLI/API/researcher surface                                     | `cli/cmd/research.ts`, `server/routes/research.ts`, `ResearchPanel.tsx` | formatting/parser pass; route E2E pending                 |
+| Contract                                                       | Implementation                                                         | Verification                                              |
+| -------------------------------------------------------------- | ---------------------------------------------------------------------- | --------------------------------------------------------- |
+| Stable project, track, iteration, protocol and run identities  | `backend/cli/src/research/domain`                                      | domain and project tests                                  |
+| Canonical hashes, Ed25519 signatures and file-per-event ledger | `domain/{canonical,event,signature}.ts`, `adapters/ledger`             | canonical, event and ledger tests; Node crypto smoke test |
+| Human/agent capability boundary                                | `domain/governance.ts`                                                 | governance tests; AI approval denial                      |
+| Existing-repository adoption, core track and Conda manifest    | `application/project.ts`, environment and identity adapters            | temporary-Git project test                                |
+| Track identity, workspace binding and environment inheritance  | `application/track.ts`, Git and Conda adapters                         | project test; explicit parent/environment assertions      |
+| Signed track environment isolation                             | `application/environment.ts`, CLI, API and researcher UI               | parent-preservation and idempotent divergence test        |
+| Mode-specific protocols and signed run intent                  | `application/investigation.ts`                                         | end-to-end domain flow in project test                    |
+| Captured Git/Conda formal run and argv-only execution          | `application/run.ts`, Git, Conda and process adapters                  | drift, redaction, replay and real-process tests           |
+| Clean-kernel formal notebook execution                         | run/process adapters and `FormalRunPanel.tsx`                          | original/executed copy and hash smoke test                |
+| Durable mutation replay and projection repair                  | ledger, track, investigation, evidence and review services             | conflict, replay and interrupted-projection tests         |
+| Versioned research events and generated API client             | `research/events.ts`, research routes, `tooling/sdk`                   | OpenAPI generation and SDK typecheck                      |
+| Human-reviewed protocol freeze                                 | investigation service, CLI, API and `ProtocolReview.tsx`               | freeze/replay flow and human-only governance tests        |
+| Bounded agent research tools                                   | `tool/research.ts`, common governance                                  | context/track/iteration schemas; AI approval denial       |
+| Verifiable artifacts, analyses, claims and track review        | `application/{evidence,review}.ts`                                     | corruption localization and signed review flow            |
+| Evidence-only integration of negative or positive outcomes     | `application/review.ts`                                                | inconclusive evidence bundle test; no code merge          |
+| Evidence, claim, review and integration API/CLI/SDK parity     | research routes, CLI and generated SDK                                 | backend and SDK typechecks; research suite                |
+| Exact-commit, human-only foundation promotion                  | `application/foundation.ts`, API, CLI and decision workspace           | clean-workspace, integrity and idempotent replay test     |
+| Scientific projection and artifact integrity audit             | `application/audit.ts`, API and CLI                                    | exact corrupted-artifact diagnostic test                  |
+| CLI/API/researcher surface                                     | CLI, research routes, `ResearchPanel.tsx` and decision/evidence panels | typechecks, production build and research suite           |
 
-Still release-blocking: automatic run-output discovery and resource capture, real Conda/Jupyter macOS/Linux notebook journeys, code-merge proposals, foundation promotion, audit/export/adoption, publication, full collaboration lifecycle, security review, accessibility/performance tests, and clean macOS/Linux golden journeys. Evidence/review researcher UX remains to be exposed.
+Still release-blocking: automatic run-output discovery and resource capture, real Conda/Jupyter macOS/Linux notebook journeys, code-merge proposals, full audit reporting and replay checks, export/adoption, publication, full collaboration lifecycle, security review, accessibility/performance tests, route/browser E2E tests, and clean macOS/Linux golden journeys.
