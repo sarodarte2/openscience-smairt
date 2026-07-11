@@ -2277,6 +2277,9 @@ export type GlobalHealthResponses = {
   200: {
     healthy: true
     version: string
+    channel: string
+    mode: "source" | "packaged"
+    commit: string
   }
 }
 
@@ -3393,6 +3396,648 @@ export type SettingsWalletGetResponses = {
 }
 
 export type SettingsWalletGetResponse = SettingsWalletGetResponses[keyof SettingsWalletGetResponses]
+
+export type ResearchScaffoldPreviewData = {
+  body?: {
+    destination: string
+    repositoryMode: "new" | "existing" | "later"
+    name: string
+    description?: string
+    author: {
+      displayName: string
+      email?: string
+    }
+    profile: {
+      question: string
+      domain: string
+      dataPhase: "synthetic" | "downloaded" | "real"
+      license: "MIT" | "BSD-3-Clause" | "Apache-2.0" | "GPL-3.0" | "proprietary"
+      paperWorkspace?: true
+      networkMode: "offline" | "ask" | "allowed"
+      egressPolicy: "public" | "restricted" | "air-gapped"
+      hpc: {
+        enabled: boolean
+        scheduler?: "slurm" | "pbs" | "sge"
+        clusterName?: string
+        account?: string
+        partition?: string
+        modules?: Array<string>
+        scratchPath?: string
+        validated?: false
+      }
+    }
+    initialIteration: {
+      title: string
+      mode: "exploratory" | "confirmatory" | "replication" | "benchmark"
+      question: string
+      decisionGoal: string
+      content:
+        | {
+            mode: "exploratory"
+            aim: string
+            intendedInputs: Array<string>
+            intendedOutputs: Array<string>
+            decisionGoal: string
+          }
+        | {
+            mode: "confirmatory"
+            hypothesis: string
+            nullHypothesis: string
+            primaryOutcome: string
+            controls: Array<string>
+            exclusions: Array<string>
+            statisticalMethod: string
+            stoppingRule: string
+            decisionRule: string
+          }
+        | {
+            mode: "replication"
+            sourceProtocol: string
+            faithfulElements: Array<string>
+            deviations: Array<string>
+            equivalenceRule: string
+          }
+        | {
+            mode: "benchmark"
+            datasetsAndSplits: Array<string>
+            baselines: Array<string>
+            metrics: Array<string>
+            leakageBoundary: string
+          }
+    }
+    environment: {
+      create: boolean
+      python: string
+      condaPackages?: Array<string>
+      pipPackages?: Array<string>
+    }
+  }
+  path?: never
+  query?: never
+  url: "/research/scaffolds/preview"
+}
+
+export type ResearchScaffoldPreviewResponses = {
+  /**
+   * Scaffold preview
+   */
+  200: {
+    slug: string
+    destination: string
+    repositoryMode: "new" | "existing" | "later"
+    environmentName: string
+    environmentYml: string
+    directories: Array<string>
+    stages: Array<string>
+  }
+}
+
+export type ResearchScaffoldPreviewResponse = ResearchScaffoldPreviewResponses[keyof ResearchScaffoldPreviewResponses]
+
+export type ResearchScaffoldStartData = {
+  body?: {
+    destination: string
+    repositoryMode: "new" | "existing" | "later"
+    name: string
+    description?: string
+    author: {
+      displayName: string
+      email?: string
+    }
+    profile: {
+      question: string
+      domain: string
+      dataPhase: "synthetic" | "downloaded" | "real"
+      license: "MIT" | "BSD-3-Clause" | "Apache-2.0" | "GPL-3.0" | "proprietary"
+      paperWorkspace?: true
+      networkMode: "offline" | "ask" | "allowed"
+      egressPolicy: "public" | "restricted" | "air-gapped"
+      hpc: {
+        enabled: boolean
+        scheduler?: "slurm" | "pbs" | "sge"
+        clusterName?: string
+        account?: string
+        partition?: string
+        modules?: Array<string>
+        scratchPath?: string
+        validated?: false
+      }
+    }
+    initialIteration: {
+      title: string
+      mode: "exploratory" | "confirmatory" | "replication" | "benchmark"
+      question: string
+      decisionGoal: string
+      content:
+        | {
+            mode: "exploratory"
+            aim: string
+            intendedInputs: Array<string>
+            intendedOutputs: Array<string>
+            decisionGoal: string
+          }
+        | {
+            mode: "confirmatory"
+            hypothesis: string
+            nullHypothesis: string
+            primaryOutcome: string
+            controls: Array<string>
+            exclusions: Array<string>
+            statisticalMethod: string
+            stoppingRule: string
+            decisionRule: string
+          }
+        | {
+            mode: "replication"
+            sourceProtocol: string
+            faithfulElements: Array<string>
+            deviations: Array<string>
+            equivalenceRule: string
+          }
+        | {
+            mode: "benchmark"
+            datasetsAndSplits: Array<string>
+            baselines: Array<string>
+            metrics: Array<string>
+            leakageBoundary: string
+          }
+    }
+    environment: {
+      create: boolean
+      python: string
+      condaPackages?: Array<string>
+      pipPackages?: Array<string>
+    }
+    passphrase?: string
+  }
+  path?: never
+  query?: never
+  url: "/research/scaffolds"
+}
+
+export type ResearchScaffoldStartResponses = {
+  /**
+   * Scaffold operation accepted
+   */
+  202: {
+    schemaVersion: 1
+    id: string
+    request: {
+      destination: string
+      repositoryMode: "new" | "existing" | "later"
+      name: string
+      description?: string
+      author: {
+        displayName: string
+        email?: string
+      }
+      profile: {
+        question: string
+        domain: string
+        dataPhase: "synthetic" | "downloaded" | "real"
+        license: "MIT" | "BSD-3-Clause" | "Apache-2.0" | "GPL-3.0" | "proprietary"
+        paperWorkspace?: true
+        networkMode: "offline" | "ask" | "allowed"
+        egressPolicy: "public" | "restricted" | "air-gapped"
+        hpc: {
+          enabled: boolean
+          scheduler?: "slurm" | "pbs" | "sge"
+          clusterName?: string
+          account?: string
+          partition?: string
+          modules?: Array<string>
+          scratchPath?: string
+          validated?: false
+        }
+      }
+      initialIteration: {
+        title: string
+        mode: "exploratory" | "confirmatory" | "replication" | "benchmark"
+        question: string
+        decisionGoal: string
+        content:
+          | {
+              mode: "exploratory"
+              aim: string
+              intendedInputs: Array<string>
+              intendedOutputs: Array<string>
+              decisionGoal: string
+            }
+          | {
+              mode: "confirmatory"
+              hypothesis: string
+              nullHypothesis: string
+              primaryOutcome: string
+              controls: Array<string>
+              exclusions: Array<string>
+              statisticalMethod: string
+              stoppingRule: string
+              decisionRule: string
+            }
+          | {
+              mode: "replication"
+              sourceProtocol: string
+              faithfulElements: Array<string>
+              deviations: Array<string>
+              equivalenceRule: string
+            }
+          | {
+              mode: "benchmark"
+              datasetsAndSplits: Array<string>
+              baselines: Array<string>
+              metrics: Array<string>
+              leakageBoundary: string
+            }
+      }
+      environment: {
+        create: boolean
+        python: string
+        condaPackages?: Array<string>
+        pipPackages?: Array<string>
+      }
+    }
+    stage:
+      | "queued"
+      | "validating"
+      | "preparing_repository"
+      | "writing_scaffold"
+      | "creating_identity"
+      | "writing_environment"
+      | "solving_environment"
+      | "bootstrapping_ledger"
+      | "verifying"
+      | "ready"
+      | "draft"
+      | "paused"
+      | "cancelled"
+      | "failed"
+    state: "queued" | "running" | "completed" | "paused" | "cancelled" | "failed"
+    message: string
+    createdAt: string
+    updatedAt: string
+    projectId?: string
+    error?: string
+  }
+}
+
+export type ResearchScaffoldStartResponse = ResearchScaffoldStartResponses[keyof ResearchScaffoldStartResponses]
+
+export type ResearchScaffoldGetData = {
+  body?: never
+  path: {
+    id: string
+  }
+  query?: never
+  url: "/research/scaffolds/{id}"
+}
+
+export type ResearchScaffoldGetResponses = {
+  /**
+   * Scaffold operation
+   */
+  200: {
+    schemaVersion: 1
+    id: string
+    request: {
+      destination: string
+      repositoryMode: "new" | "existing" | "later"
+      name: string
+      description?: string
+      author: {
+        displayName: string
+        email?: string
+      }
+      profile: {
+        question: string
+        domain: string
+        dataPhase: "synthetic" | "downloaded" | "real"
+        license: "MIT" | "BSD-3-Clause" | "Apache-2.0" | "GPL-3.0" | "proprietary"
+        paperWorkspace?: true
+        networkMode: "offline" | "ask" | "allowed"
+        egressPolicy: "public" | "restricted" | "air-gapped"
+        hpc: {
+          enabled: boolean
+          scheduler?: "slurm" | "pbs" | "sge"
+          clusterName?: string
+          account?: string
+          partition?: string
+          modules?: Array<string>
+          scratchPath?: string
+          validated?: false
+        }
+      }
+      initialIteration: {
+        title: string
+        mode: "exploratory" | "confirmatory" | "replication" | "benchmark"
+        question: string
+        decisionGoal: string
+        content:
+          | {
+              mode: "exploratory"
+              aim: string
+              intendedInputs: Array<string>
+              intendedOutputs: Array<string>
+              decisionGoal: string
+            }
+          | {
+              mode: "confirmatory"
+              hypothesis: string
+              nullHypothesis: string
+              primaryOutcome: string
+              controls: Array<string>
+              exclusions: Array<string>
+              statisticalMethod: string
+              stoppingRule: string
+              decisionRule: string
+            }
+          | {
+              mode: "replication"
+              sourceProtocol: string
+              faithfulElements: Array<string>
+              deviations: Array<string>
+              equivalenceRule: string
+            }
+          | {
+              mode: "benchmark"
+              datasetsAndSplits: Array<string>
+              baselines: Array<string>
+              metrics: Array<string>
+              leakageBoundary: string
+            }
+      }
+      environment: {
+        create: boolean
+        python: string
+        condaPackages?: Array<string>
+        pipPackages?: Array<string>
+      }
+    }
+    stage:
+      | "queued"
+      | "validating"
+      | "preparing_repository"
+      | "writing_scaffold"
+      | "creating_identity"
+      | "writing_environment"
+      | "solving_environment"
+      | "bootstrapping_ledger"
+      | "verifying"
+      | "ready"
+      | "draft"
+      | "paused"
+      | "cancelled"
+      | "failed"
+    state: "queued" | "running" | "completed" | "paused" | "cancelled" | "failed"
+    message: string
+    createdAt: string
+    updatedAt: string
+    projectId?: string
+    error?: string
+  }
+}
+
+export type ResearchScaffoldGetResponse = ResearchScaffoldGetResponses[keyof ResearchScaffoldGetResponses]
+
+export type ResearchScaffoldCancelData = {
+  body?: never
+  path: {
+    id: string
+  }
+  query?: never
+  url: "/research/scaffolds/{id}/cancel"
+}
+
+export type ResearchScaffoldCancelResponses = {
+  /**
+   * Cancelled scaffold operation
+   */
+  200: {
+    schemaVersion: 1
+    id: string
+    request: {
+      destination: string
+      repositoryMode: "new" | "existing" | "later"
+      name: string
+      description?: string
+      author: {
+        displayName: string
+        email?: string
+      }
+      profile: {
+        question: string
+        domain: string
+        dataPhase: "synthetic" | "downloaded" | "real"
+        license: "MIT" | "BSD-3-Clause" | "Apache-2.0" | "GPL-3.0" | "proprietary"
+        paperWorkspace?: true
+        networkMode: "offline" | "ask" | "allowed"
+        egressPolicy: "public" | "restricted" | "air-gapped"
+        hpc: {
+          enabled: boolean
+          scheduler?: "slurm" | "pbs" | "sge"
+          clusterName?: string
+          account?: string
+          partition?: string
+          modules?: Array<string>
+          scratchPath?: string
+          validated?: false
+        }
+      }
+      initialIteration: {
+        title: string
+        mode: "exploratory" | "confirmatory" | "replication" | "benchmark"
+        question: string
+        decisionGoal: string
+        content:
+          | {
+              mode: "exploratory"
+              aim: string
+              intendedInputs: Array<string>
+              intendedOutputs: Array<string>
+              decisionGoal: string
+            }
+          | {
+              mode: "confirmatory"
+              hypothesis: string
+              nullHypothesis: string
+              primaryOutcome: string
+              controls: Array<string>
+              exclusions: Array<string>
+              statisticalMethod: string
+              stoppingRule: string
+              decisionRule: string
+            }
+          | {
+              mode: "replication"
+              sourceProtocol: string
+              faithfulElements: Array<string>
+              deviations: Array<string>
+              equivalenceRule: string
+            }
+          | {
+              mode: "benchmark"
+              datasetsAndSplits: Array<string>
+              baselines: Array<string>
+              metrics: Array<string>
+              leakageBoundary: string
+            }
+      }
+      environment: {
+        create: boolean
+        python: string
+        condaPackages?: Array<string>
+        pipPackages?: Array<string>
+      }
+    }
+    stage:
+      | "queued"
+      | "validating"
+      | "preparing_repository"
+      | "writing_scaffold"
+      | "creating_identity"
+      | "writing_environment"
+      | "solving_environment"
+      | "bootstrapping_ledger"
+      | "verifying"
+      | "ready"
+      | "draft"
+      | "paused"
+      | "cancelled"
+      | "failed"
+    state: "queued" | "running" | "completed" | "paused" | "cancelled" | "failed"
+    message: string
+    createdAt: string
+    updatedAt: string
+    projectId?: string
+    error?: string
+  }
+}
+
+export type ResearchScaffoldCancelResponse = ResearchScaffoldCancelResponses[keyof ResearchScaffoldCancelResponses]
+
+export type ResearchScaffoldResumeData = {
+  body?: {
+    passphrase?: string
+  }
+  path: {
+    id: string
+  }
+  query?: never
+  url: "/research/scaffolds/{id}/resume"
+}
+
+export type ResearchScaffoldResumeErrors = {
+  /**
+   * Not resumable
+   */
+  409: unknown
+}
+
+export type ResearchScaffoldResumeResponses = {
+  /**
+   * Resumed scaffold operation
+   */
+  200: {
+    schemaVersion: 1
+    id: string
+    request: {
+      destination: string
+      repositoryMode: "new" | "existing" | "later"
+      name: string
+      description?: string
+      author: {
+        displayName: string
+        email?: string
+      }
+      profile: {
+        question: string
+        domain: string
+        dataPhase: "synthetic" | "downloaded" | "real"
+        license: "MIT" | "BSD-3-Clause" | "Apache-2.0" | "GPL-3.0" | "proprietary"
+        paperWorkspace?: true
+        networkMode: "offline" | "ask" | "allowed"
+        egressPolicy: "public" | "restricted" | "air-gapped"
+        hpc: {
+          enabled: boolean
+          scheduler?: "slurm" | "pbs" | "sge"
+          clusterName?: string
+          account?: string
+          partition?: string
+          modules?: Array<string>
+          scratchPath?: string
+          validated?: false
+        }
+      }
+      initialIteration: {
+        title: string
+        mode: "exploratory" | "confirmatory" | "replication" | "benchmark"
+        question: string
+        decisionGoal: string
+        content:
+          | {
+              mode: "exploratory"
+              aim: string
+              intendedInputs: Array<string>
+              intendedOutputs: Array<string>
+              decisionGoal: string
+            }
+          | {
+              mode: "confirmatory"
+              hypothesis: string
+              nullHypothesis: string
+              primaryOutcome: string
+              controls: Array<string>
+              exclusions: Array<string>
+              statisticalMethod: string
+              stoppingRule: string
+              decisionRule: string
+            }
+          | {
+              mode: "replication"
+              sourceProtocol: string
+              faithfulElements: Array<string>
+              deviations: Array<string>
+              equivalenceRule: string
+            }
+          | {
+              mode: "benchmark"
+              datasetsAndSplits: Array<string>
+              baselines: Array<string>
+              metrics: Array<string>
+              leakageBoundary: string
+            }
+      }
+      environment: {
+        create: boolean
+        python: string
+        condaPackages?: Array<string>
+        pipPackages?: Array<string>
+      }
+    }
+    stage:
+      | "queued"
+      | "validating"
+      | "preparing_repository"
+      | "writing_scaffold"
+      | "creating_identity"
+      | "writing_environment"
+      | "solving_environment"
+      | "bootstrapping_ledger"
+      | "verifying"
+      | "ready"
+      | "draft"
+      | "paused"
+      | "cancelled"
+      | "failed"
+    state: "queued" | "running" | "completed" | "paused" | "cancelled" | "failed"
+    message: string
+    createdAt: string
+    updatedAt: string
+    projectId?: string
+    error?: string
+  }
+}
+
+export type ResearchScaffoldResumeResponse = ResearchScaffoldResumeResponses[keyof ResearchScaffoldResumeResponses]
 
 export type AuthRemoveData = {
   body?: never
@@ -5912,6 +6557,25 @@ export type ResearchStatusResponses = {
           }
           coreTrackId: string
           activeFoundationId: string | null
+          profile?: {
+            question: string
+            domain: string
+            dataPhase: "synthetic" | "downloaded" | "real"
+            license: "MIT" | "BSD-3-Clause" | "Apache-2.0" | "GPL-3.0" | "proprietary"
+            paperWorkspace: true
+            networkMode: "offline" | "ask" | "allowed"
+            egressPolicy: "public" | "restricted" | "air-gapped"
+            hpc: {
+              enabled: boolean
+              scheduler?: "slurm" | "pbs" | "sge"
+              clusterName?: string
+              account?: string
+              partition?: string
+              modules?: Array<string>
+              scratchPath?: string
+              validated: false
+            }
+          }
         }
         eventCount: number
         readOnly: boolean
@@ -5980,6 +6644,46 @@ export type ResearchLedgerResponses = {
 }
 
 export type ResearchLedgerResponse = ResearchLedgerResponses[keyof ResearchLedgerResponses]
+
+export type ResearchWorkflowData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+  }
+  url: "/research/workflow"
+}
+
+export type ResearchWorkflowResponses = {
+  /**
+   * Signed-state-derived research workflow
+   */
+  200: {
+    projectId: string
+    selectedTrackId: string
+    selectedIterationId: string | null
+    currentStage: "frame" | "hypothesize" | "plan" | "execute" | "interpret" | "review" | "decide"
+    stages: Array<{
+      id: "frame" | "hypothesize" | "plan" | "execute" | "interpret" | "review" | "decide"
+      label: string
+      detail: string
+      state: "complete" | "current" | "pending" | "blocked"
+    }>
+    blockers: Array<{
+      code: string
+      message: string
+    }>
+    nextActions: Array<{
+      id: string
+      label: string
+      section: "overview" | "tracks" | "evidence" | "publications" | "people"
+      enabled: boolean
+      reason?: string
+    }>
+  }
+}
+
+export type ResearchWorkflowResponse = ResearchWorkflowResponses[keyof ResearchWorkflowResponses]
 
 export type ResearchAuditData = {
   body?: never
@@ -6189,6 +6893,202 @@ export type ResearchMemberAddResponses = {
 }
 
 export type ResearchMemberAddResponse = ResearchMemberAddResponses[keyof ResearchMemberAddResponses]
+
+export type ResearchCollaborationJoinRequestData = {
+  body?: {
+    displayName: string
+    email?: string
+    passphrase?: string
+  }
+  path?: never
+  query?: {
+    directory?: string
+  }
+  url: "/research/collaboration/join-request"
+}
+
+export type ResearchCollaborationJoinRequestErrors = {
+  /**
+   * Local signing identity needs a passphrase
+   */
+  422: unknown
+}
+
+export type ResearchCollaborationJoinRequestResponses = {
+  /**
+   * Portable signed join-request bundle
+   */
+  200: {
+    bundle: string
+    request: unknown
+  }
+}
+
+export type ResearchCollaborationJoinRequestResponse =
+  ResearchCollaborationJoinRequestResponses[keyof ResearchCollaborationJoinRequestResponses]
+
+export type ResearchCollaborationPreviewJoinRequestData = {
+  body?: {
+    bundle: string
+  }
+  path?: never
+  query?: {
+    directory?: string
+  }
+  url: "/research/collaboration/join-request/preview"
+}
+
+export type ResearchCollaborationPreviewJoinRequestErrors = {
+  /**
+   * The join request is invalid
+   */
+  422: unknown
+}
+
+export type ResearchCollaborationPreviewJoinRequestResponses = {
+  /**
+   * Verified signed identity details
+   */
+  200: {
+    displayName: string
+    email?: string
+    signingKeyId: string
+    issuedAt: string
+  }
+}
+
+export type ResearchCollaborationPreviewJoinRequestResponse =
+  ResearchCollaborationPreviewJoinRequestResponses[keyof ResearchCollaborationPreviewJoinRequestResponses]
+
+export type ResearchMemberImportData = {
+  body?: {
+    bundle: string
+    memberRole: "owner" | "researcher" | "reviewer" | "viewer"
+    passphrase?: string
+    humanConfirmed: true
+  }
+  headers: {
+    "idempotency-key": string
+  }
+  path?: never
+  query?: {
+    directory?: string
+  }
+  url: "/research/members/import"
+}
+
+export type ResearchMemberImportErrors = {
+  /**
+   * Only an owner may accept a collaborator
+   */
+  403: unknown
+  /**
+   * Membership or idempotency conflict
+   */
+  409: unknown
+  /**
+   * The join request is invalid
+   */
+  422: unknown
+}
+
+export type ResearchMemberImportResponses = {
+  /**
+   * Signed membership record
+   */
+  200: {
+    member: {
+      schemaVersion: 1
+      projectId: string
+      createdAt: string
+      createdBy: {
+        kind: "human" | "agent" | "system"
+        id: string
+        displayName: string
+        delegationId?: string
+      }
+      id: string
+      actorId?: string
+      displayName: string
+      email?: string
+      gitName?: string
+      gitEmail?: string
+      role: "owner" | "researcher" | "reviewer" | "viewer"
+      signingKeyId: string
+      active: boolean
+    }
+    eventId: string
+    replayed: boolean
+  }
+}
+
+export type ResearchMemberImportResponse = ResearchMemberImportResponses[keyof ResearchMemberImportResponses]
+
+export type ResearchEnvironmentApplyData = {
+  body?: {
+    python?: string
+    condaPackages?: Array<string>
+    pipPackages?: Array<string>
+    expectedSpecHash: string
+    passphrase?: string
+    humanConfirmed: true
+  }
+  headers: {
+    "idempotency-key": string
+  }
+  path: {
+    trackId: string
+  }
+  query?: {
+    directory?: string
+  }
+  url: "/research/environments/{trackId}/apply"
+}
+
+export type ResearchEnvironmentApplyErrors = {
+  /**
+   * Local identity lacks environment-management capability
+   */
+  403: unknown
+  /**
+   * Stale plan, active run, or read-only research record
+   */
+  409: unknown
+}
+
+export type ResearchEnvironmentApplyResponses = {
+  /**
+   * Signed environment update
+   */
+  200: {
+    environment: {
+      schemaVersion: 1
+      projectId: string
+      createdAt: string
+      createdBy: {
+        kind: "human" | "agent" | "system"
+        id: string
+        displayName: string
+        delegationId?: string
+      }
+      trackId: string
+      kind: "conda"
+      name: string
+      portableSpecPath: string
+      portableSpecHash: string
+      state: "base" | "inherited" | "diverged"
+      inheritedFromTrackId: string | null
+    }
+    eventId: string
+    replayed: boolean
+    additions: Array<string>
+    removals: Array<string>
+    rollback: string
+  }
+}
+
+export type ResearchEnvironmentApplyResponse =
+  ResearchEnvironmentApplyResponses[keyof ResearchEnvironmentApplyResponses]
 
 export type ResearchMemberRoleData = {
   body?: {
@@ -6526,6 +7426,25 @@ export type ResearchInitializeResponses = {
           }
           coreTrackId: string
           activeFoundationId: string | null
+          profile?: {
+            question: string
+            domain: string
+            dataPhase: "synthetic" | "downloaded" | "real"
+            license: "MIT" | "BSD-3-Clause" | "Apache-2.0" | "GPL-3.0" | "proprietary"
+            paperWorkspace: true
+            networkMode: "offline" | "ask" | "allowed"
+            egressPolicy: "public" | "restricted" | "air-gapped"
+            hpc: {
+              enabled: boolean
+              scheduler?: "slurm" | "pbs" | "sge"
+              clusterName?: string
+              account?: string
+              partition?: string
+              modules?: Array<string>
+              scratchPath?: string
+              validated: false
+            }
+          }
         }
         eventCount: number
         readOnly: boolean
@@ -7110,6 +8029,70 @@ export type ResearchEnvironmentListResponses = {
 }
 
 export type ResearchEnvironmentListResponse = ResearchEnvironmentListResponses[keyof ResearchEnvironmentListResponses]
+
+export type ResearchEnvironmentPlanData = {
+  body?: {
+    python?: string
+    condaPackages?: Array<string>
+    pipPackages?: Array<string>
+    solve?: boolean
+  }
+  path: {
+    trackId: string
+  }
+  query?: {
+    directory?: string
+  }
+  url: "/research/environments/{trackId}/plan"
+}
+
+export type ResearchEnvironmentPlanErrors = {
+  /**
+   * Environment binding conflict
+   */
+  409: unknown
+}
+
+export type ResearchEnvironmentPlanResponses = {
+  /**
+   * Environment diff and solve plan
+   */
+  200: {
+    trackId: string
+    environmentName: string
+    portableSpecPath: string
+    currentEnvironmentYml: string
+    proposedEnvironmentYml: string
+    currentSpecHash: string
+    proposedSpecHash: string
+    additions: Array<string>
+    removals: Array<string>
+    solve:
+      | {
+          state: "not_requested"
+        }
+      | {
+          state: "solvable"
+          output: string
+        }
+      | {
+          state: "conda_unavailable"
+          error: string
+        }
+      | {
+          state: "conflict"
+          error: string
+        }
+    blockingRuns: Array<{
+      id: string
+      state: string
+      iterationId: string
+    }>
+    canApply: boolean
+  }
+}
+
+export type ResearchEnvironmentPlanResponse = ResearchEnvironmentPlanResponses[keyof ResearchEnvironmentPlanResponses]
 
 export type ResearchEnvironmentIsolateData = {
   body?: {
@@ -8457,6 +9440,25 @@ export type ResearchFoundationPromoteResponses = {
       }
       coreTrackId: string
       activeFoundationId: string | null
+      profile?: {
+        question: string
+        domain: string
+        dataPhase: "synthetic" | "downloaded" | "real"
+        license: "MIT" | "BSD-3-Clause" | "Apache-2.0" | "GPL-3.0" | "proprietary"
+        paperWorkspace: true
+        networkMode: "offline" | "ask" | "allowed"
+        egressPolicy: "public" | "restricted" | "air-gapped"
+        hpc: {
+          enabled: boolean
+          scheduler?: "slurm" | "pbs" | "sge"
+          clusterName?: string
+          account?: string
+          partition?: string
+          modules?: Array<string>
+          scratchPath?: string
+          validated: false
+        }
+      }
     }
     eventId: string
     replayed: boolean

@@ -124,13 +124,19 @@ await $`rm -rf dist`
 // fresh clone vite's resolver fails with cryptic "Cannot find package" errors
 // — run the workspace install if `node_modules` is missing.
 const repoRoot = path.resolve(dir, "../..")
+const commit = (await $`git rev-parse --short=12 HEAD`.cwd(repoRoot).text()).trim()
 const webAppDir = path.resolve(repoRoot, "frontend/workspace")
 if (!fs.existsSync(path.join(repoRoot, "node_modules")) || !fs.existsSync(path.join(webAppDir, "node_modules"))) {
   console.log("workspace node_modules missing — running bun install at repo root")
   await $`bun install`.cwd(repoRoot)
 }
 console.log("building frontend/workspace (openscience web)")
-await $`bun run build`.cwd(webAppDir)
+await $`bun run build`.cwd(webAppDir).env({
+  ...process.env,
+  VITE_OPENSCIENCE_BUILD_COMMIT: commit,
+  VITE_OPENSCIENCE_BUILD_VERSION: Script.version,
+  VITE_OPENSCIENCE_BUILD_CHANNEL: Script.channel,
+})
 await $`bun run script/generate-web-assets.ts`
 
 // Generate encryption key for prompt files (unique per build)
@@ -176,6 +182,7 @@ for (const item of targets) {
       ...keyDefines,
       OPENSCIENCE_VERSION: `'${Script.version}'`,
       OPENSCIENCE_CHANNEL: `'${Script.channel}'`,
+      OPENSCIENCE_COMMIT: `'${commit}'`,
       OPENSCIENCE_LIBC: item.os === "linux" ? `'${item.abi ?? "glibc"}'` : "",
     },
   })

@@ -4,9 +4,8 @@
 /*
   OpenScience editorial typography.
 
-  A research-workbench voice: Computer Modern (Latin Modern Roman) is the single
-  UI typeface — headings and body both resolve to it via --font-family-serif /
-  --font-family-sans; JetBrains Mono is reserved for code. Kept in @layer base
+  Native system typography keeps controls familiar and consistent. Computer
+  Modern is reserved for scientific/editorial content and JetBrains Mono for code. Kept in @layer base
   with bare-element selectors so any component class or inline style still wins —
   this only sets the resting default.
 */
@@ -19,8 +18,8 @@
   h4,
   h5,
   h6 {
-    font-family: var(--font-family-serif);
-    font-feature-settings: var(--font-family-serif--font-feature-settings, normal);
+    font-family: var(--font-family-sans);
+    font-feature-settings: var(--font-family-sans--font-feature-settings, normal);
     font-optical-sizing: auto;
     font-weight: 400;
     letter-spacing: -0.011em;
@@ -40,7 +39,7 @@
   notes, markdown). Airy measure and calm rhythm, paper-like.
 */
 .prose-editorial {
-  font-family: var(--font-family-sans);
+  font-family: var(--font-family-serif);
   font-size: var(--font-size-large, 15px);
   line-height: 1.7;
   color: var(--text-base, var(--color-text));

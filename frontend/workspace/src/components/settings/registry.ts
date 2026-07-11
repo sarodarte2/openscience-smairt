@@ -20,7 +20,7 @@ import type { IconProps } from "@synsci/ui/icon"
 // HARD RULE: no dead buttons. A panel either wires to a real backend or omits
 // the control. Placeholder panels below ship with zero interactive controls.
 
-export type SettingsSection = "capabilities" | "workspace"
+export type SettingsSection = "capabilities" | "workspace" | "managed"
 
 export type SettingsPanelId =
   | "skills"
@@ -120,11 +120,33 @@ export const SETTINGS_PANELS: SettingsPanel[] = [
     section: "workspace",
     component: lazy(() => import("./General")),
   },
+  {
+    id: "spend",
+    title: "Routing",
+    icon: "providers",
+    section: "managed",
+    component: lazy(() => import("./Spend")),
+  },
+  {
+    id: "wallet",
+    title: "Wallet",
+    icon: "providers",
+    section: "managed",
+    component: lazy(() => import("./Wallet")),
+  },
+  {
+    id: "usage",
+    title: "Usage",
+    icon: "server",
+    section: "managed",
+    component: lazy(() => import("./Usage")),
+  },
 ]
 
 export const SETTINGS_SECTIONS: { id: SettingsSection; label: string }[] = [
   { id: "capabilities", label: "Capabilities" },
   { id: "workspace", label: "Workspace" },
+  { id: "managed", label: "Optional managed services" },
 ]
 
 export function findPanel(id: SettingsPanelId): SettingsPanel {

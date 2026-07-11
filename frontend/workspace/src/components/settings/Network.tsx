@@ -4,6 +4,8 @@ import { Icon } from "@synsci/ui/icon"
 import { Switch } from "@synsci/ui/switch"
 import { useGlobalSDK } from "@/context/global-sdk"
 import { usePlatform } from "@/context/platform"
+import { useDialog } from "@synsci/ui/context/dialog"
+import { confirmDialog } from "@/thesis/dialogs"
 
 // Outbound domain allow-list. Wired to a real backend store:
 // GET/PUT /settings/network (backend/cli/src/settings/network.ts). The catalog
@@ -18,6 +20,7 @@ export default function Network() {
   const sdk = useGlobalSDK()
   const platform = usePlatform()
   const doFetch = platform.fetch ?? fetch
+  const dialog = useDialog()
 
   const [catalog, setCatalog] = createSignal<Group[]>([])
   const [state, setState] = createSignal<State>({ allowlistEnabled: false, enabled: [], custom: [] })
@@ -96,9 +99,17 @@ export default function Network() {
     void persist({ ...state(), custom: state().custom.filter((d) => d !== domain) })
   }
 
-  function clearCustom() {
+  async function clearCustom() {
     if (state().custom.length === 0) return
-    if (!window.confirm("Remove all custom allowed domains?")) return
+    if (
+      !(await confirmDialog(dialog, {
+        title: "Remove all custom domains?",
+        message: "The curated connector groups are not changed.",
+        confirmLabel: "Remove",
+        danger: true,
+      }))
+    )
+      return
     void persist({ ...state(), custom: [] })
   }
 

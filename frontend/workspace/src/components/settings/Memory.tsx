@@ -4,6 +4,8 @@ import { Icon } from "@synsci/ui/icon"
 import { Switch } from "@synsci/ui/switch"
 import { useGlobalSDK } from "@/context/global-sdk"
 import { usePlatform } from "@/context/platform"
+import { useDialog } from "@synsci/ui/context/dialog"
+import { confirmDialog } from "@/thesis/dialogs"
 
 // Persistent notes/instructions the agent recalls across sessions. Wired to a
 // real backend store: GET/PUT /settings/memory (backend/cli/src/settings/memory.ts).
@@ -22,6 +24,7 @@ export default function Memory() {
   const sdk = useGlobalSDK()
   const platform = usePlatform()
   const doFetch = platform.fetch ?? fetch
+  const dialog = useDialog()
 
   const [scope, setScope] = createSignal<Scope>("global")
   const [doc, setDoc] = createSignal<Doc>({ enabled: true, categories: [] })
@@ -83,8 +86,15 @@ export default function Memory() {
     void persist({ ...doc(), enabled })
   }
 
-  function clearAll() {
-    if (!window.confirm(`Clear all ${scope() === "global" ? "global" : "project"} memory? This cannot be undone.`))
+  async function clearAll() {
+    if (
+      !(await confirmDialog(dialog, {
+        title: `Clear ${scope() === "global" ? "global" : "project"} memory?`,
+        message: "This cannot be undone.",
+        confirmLabel: "Clear",
+        danger: true,
+      }))
+    )
       return
     void persist({ enabled: doc().enabled, categories: [] })
   }

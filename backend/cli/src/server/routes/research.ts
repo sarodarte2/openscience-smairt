@@ -41,7 +41,7 @@ import { ProjectMembership } from "../../research/application/membership"
 import { InvestigationService } from "../../research/application/investigation"
 import { ResearchAuthorizationError } from "../../research/domain/governance"
 import { NotebookValidationError, ResearchRunService, RunStateError } from "../../research/application/run"
-import { ResearchEnvironmentService } from "../../research/application/environment"
+import { EnvironmentUpdateConflictError, ResearchEnvironmentService } from "../../research/application/environment"
 import { ResearchEvidenceService } from "../../research/application/evidence"
 import { ResearchReviewService } from "../../research/application/review"
 import { ResearchFoundationService } from "../../research/application/foundation"
@@ -49,6 +49,8 @@ import { ResearchAdoptionService } from "../../research/application/adopt"
 import { ResearchExportService } from "../../research/application/export"
 import { ResearchIntegrationService } from "../../research/application/integration"
 import { ResearchPublicationService } from "../../research/application/publication"
+import { ResearchWorkflow, ResearchWorkflowService } from "../../research/application/workflow"
+import { ResearchCollaborationService } from "../../research/application/collaboration"
 
 const Status = z.discriminatedUnion("initialized", [
   z.object({ initialized: z.literal(false), root: z.string() }),
@@ -163,6 +165,42 @@ const IsolateEnvironment = z.object({
   humanConfirmed: z.literal(true),
 })
 
+const PlanEnvironment = z.object({
+  python: z
+    .string()
+    .regex(/^3\.(?:10|11|12|13)$/)
+    .default("3.12"),
+  condaPackages: z.array(z.string().min(1).max(200)).max(200).default([]),
+  pipPackages: z.array(z.string().min(1).max(200)).max(200).default([]),
+  solve: z.boolean().default(false),
+})
+
+const ApplyEnvironment = PlanEnvironment.omit({ solve: true }).extend({
+  expectedSpecHash: z.string().regex(/^[0-9a-f]{64}$/),
+  passphrase: z.string().min(12).optional(),
+  humanConfirmed: z.literal(true),
+})
+
+const EnvironmentPlan = z.object({
+  trackId: z.string(),
+  environmentName: z.string(),
+  portableSpecPath: z.string(),
+  currentEnvironmentYml: z.string(),
+  proposedEnvironmentYml: z.string(),
+  currentSpecHash: z.string(),
+  proposedSpecHash: z.string(),
+  additions: z.array(z.string()),
+  removals: z.array(z.string()),
+  solve: z.discriminatedUnion("state", [
+    z.object({ state: z.literal("not_requested") }),
+    z.object({ state: z.literal("solvable"), output: z.string() }),
+    z.object({ state: z.literal("conda_unavailable"), error: z.string() }),
+    z.object({ state: z.literal("conflict"), error: z.string() }),
+  ]),
+  blockingRuns: z.array(z.object({ id: z.string(), state: z.string(), iterationId: z.string() })),
+  canApply: z.boolean(),
+})
+
 const RegisterArtifact = z.object({
   iterationId: z.string().min(1),
   file: z.string().min(1).max(8000),
@@ -260,6 +298,21 @@ const RemoveMember = z.object({
   humanConfirmed: z.literal(true),
 })
 
+const CreateJoinRequest = z.object({
+  displayName: z.string().min(1).max(200),
+  email: z.string().email().optional(),
+  passphrase: z.string().min(12).optional(),
+})
+
+const ImportJoinRequest = z.object({
+  bundle: z.string().min(1).max(100_000),
+  memberRole: MemberRole,
+  passphrase: z.string().min(12).optional(),
+  humanConfirmed: z.literal(true),
+})
+
+const PreviewJoinRequest = z.object({ bundle: z.string().min(1).max(100_000) })
+
 const CreatePublication = z.object({
   title: z.string().min(1).max(500),
   abstract: z.string().min(1).max(24000),
@@ -322,6 +375,9 @@ async function operation<T>(
     if (error instanceof RunStateError) {
       throw new HTTPException(409, { message: error.message })
     }
+    if (error instanceof EnvironmentUpdateConflictError) {
+      throw new HTTPException(409, { message: error.message })
+    }
     if (error instanceof NotebookValidationError) {
       throw new HTTPException(422, { message: error.message })
     }
@@ -358,7 +414,233 @@ async function status(root: string): Promise<z.infer<typeof Status>> {
   }
 }
 
-export const ResearchRoutes = lazy(() =>
+const EnvironmentManagementRoutes = new Hono().post(
+  "/environments/:trackId/plan",
+  describeRoute({
+    summary: "Preview and optionally dry-run-solve an exact track environment change",
+    operationId: "research.environment.plan",
+    responses: {
+      200: {
+        description: "Environment diff and solve plan",
+        content: { "application/json": { schema: resolver(EnvironmentPlan) } },
+      },
+      409: { description: "Environment binding conflict" },
+    },
+  }),
+  validator("param", z.object({ trackId: z.string().min(1) })),
+  validator("json", PlanEnvironment),
+  async (c) =>
+    c.json(
+      await ResearchEnvironmentService.plan({
+        projectRoot: Instance.directory,
+        trackId: c.req.valid("param").trackId,
+        ...c.req.valid("json"),
+      }),
+    ),
+)
+
+const CollaborationRoutes = new Hono()
+  .post(
+    "/collaboration/join-request",
+    describeRoute({
+      summary: "Create a signed offline collaboration request without exposing key fingerprints",
+      operationId: "research.collaboration.joinRequest",
+      responses: {
+        200: {
+          description: "Portable signed join-request bundle",
+          content: {
+            "application/json": {
+              schema: resolver(z.object({ bundle: z.string(), request: z.unknown() })),
+            },
+          },
+        },
+        422: { description: "Local signing identity needs a passphrase" },
+      },
+    }),
+    validator("json", CreateJoinRequest),
+    async (c) => {
+      const body = c.req.valid("json")
+      const signer = await LocalIdentity.loadOrCreate({ passphrase: body.passphrase })
+      return c.json(
+        await ResearchCollaborationService.createJoinRequest({
+          projectRoot: Instance.directory,
+          displayName: body.displayName,
+          email: body.email,
+          signer,
+        }),
+      )
+    },
+  )
+  .post(
+    "/collaboration/join-request/preview",
+    describeRoute({
+      summary: "Verify and display a signed collaboration request before assigning a role",
+      operationId: "research.collaboration.previewJoinRequest",
+      responses: {
+        200: {
+          description: "Verified signed identity details",
+          content: {
+            "application/json": {
+              schema: resolver(
+                z.object({
+                  displayName: z.string(),
+                  email: z.string().optional(),
+                  signingKeyId: z.string(),
+                  issuedAt: z.string(),
+                }),
+              ),
+            },
+          },
+        },
+        422: { description: "The join request is invalid" },
+      },
+    }),
+    validator("json", PreviewJoinRequest),
+    async (c) => {
+      const request = await ResearchCollaborationService.verifyJoinRequest({
+        projectRoot: Instance.directory,
+        bundle: c.req.valid("json").bundle,
+      }).catch((error) => {
+        throw new HTTPException(422, { message: error instanceof Error ? error.message : String(error) })
+      })
+      return c.json({
+        displayName: request.displayName,
+        email: request.email,
+        signingKeyId: request.signingKeyId,
+        issuedAt: request.issuedAt,
+      })
+    },
+  )
+  .post(
+    "/members/import",
+    describeRoute({
+      summary: "Verify an offline join request and sign the resulting project membership",
+      operationId: "research.member.import",
+      responses: {
+        200: {
+          description: "Signed membership record",
+          content: {
+            "application/json": {
+              schema: resolver(z.object({ member: ProjectMember, eventId: z.string(), replayed: z.boolean() })),
+            },
+          },
+        },
+        403: { description: "Only an owner may accept a collaborator" },
+        409: { description: "Membership or idempotency conflict" },
+        422: { description: "The join request is invalid" },
+      },
+    }),
+    validator("header", IdempotencyHeader),
+    validator("json", ImportJoinRequest),
+    async (c) => {
+      const body = c.req.valid("json")
+      const idempotencyKey = c.req.valid("header")["idempotency-key"]
+      const project = await researchProject(Instance.directory)
+      const result = await operation(
+        { operationId: idempotencyKey, projectId: project.id, kind: "research.member.import" },
+        async () => {
+          const request = await ResearchCollaborationService.verifyJoinRequest({
+            projectRoot: Instance.directory,
+            bundle: body.bundle,
+          }).catch((error) => {
+            throw new HTTPException(422, { message: error instanceof Error ? error.message : String(error) })
+          })
+          const signer = await LocalIdentity.loadOrCreate({ passphrase: body.passphrase })
+          const member = await ProjectMembership.localMember(Instance.directory, signer.keyId)
+          if (!member)
+            throw new HTTPException(403, { message: "The local signing identity is not an active project member" })
+          return ProjectMembership.add({
+            projectRoot: Instance.directory,
+            displayName: request.displayName,
+            email: request.email,
+            memberRole: body.memberRole,
+            signingKeyId: request.signingKeyId,
+            actor: { kind: "human", id: member.id, displayName: member.displayName },
+            role: member.role,
+            signer,
+            idempotencyKey,
+          })
+        },
+      )
+      await Bus.publish(ResearchEvents.MemberUpdated, {
+        version: 1,
+        projectId: result.member.projectId,
+        memberId: result.member.id,
+        eventId: result.eventId,
+        action: "added",
+        replayed: result.replayed,
+      })
+      return c.json(result)
+    },
+  )
+  .post(
+    "/environments/:trackId/apply",
+    describeRoute({
+      summary: "Apply a reviewed, versioned environment change when no formal run conflicts",
+      operationId: "research.environment.apply",
+      responses: {
+        200: {
+          description: "Signed environment update",
+          content: {
+            "application/json": {
+              schema: resolver(
+                z.object({
+                  environment: TrackEnvironment,
+                  eventId: z.string(),
+                  replayed: z.boolean(),
+                  additions: z.array(z.string()),
+                  removals: z.array(z.string()),
+                  rollback: z.string(),
+                }),
+              ),
+            },
+          },
+        },
+        403: { description: "Local identity lacks environment-management capability" },
+        409: { description: "Stale plan, active run, or read-only research record" },
+      },
+    }),
+    validator("param", z.object({ trackId: z.string().min(1) })),
+    validator("header", IdempotencyHeader),
+    validator("json", ApplyEnvironment),
+    async (c) => {
+      const body = c.req.valid("json")
+      const idempotencyKey = c.req.valid("header")["idempotency-key"]
+      const project = await researchProject(Instance.directory)
+      const result = await operation(
+        { operationId: idempotencyKey, projectId: project.id, kind: "environment.apply" },
+        async () => {
+          const signer = await LocalIdentity.loadOrCreate({ passphrase: body.passphrase })
+          const member = await ProjectMembership.localMember(Instance.directory, signer.keyId)
+          if (!member)
+            throw new HTTPException(403, { message: "The local signing identity is not an active project member" })
+          return ResearchEnvironmentService.apply({
+            projectRoot: Instance.directory,
+            trackId: c.req.valid("param").trackId,
+            python: body.python,
+            condaPackages: body.condaPackages,
+            pipPackages: body.pipPackages,
+            expectedSpecHash: body.expectedSpecHash,
+            actor: { kind: "human", id: member.id, displayName: member.displayName },
+            role: member.role,
+            signer,
+            idempotencyKey,
+          })
+        },
+      )
+      await Bus.publish(ResearchEvents.TrackUpdated, {
+        version: 1,
+        projectId: project.id,
+        trackId: result.environment.trackId,
+        eventId: result.eventId,
+        action: "environment_diverged",
+        replayed: result.replayed,
+      })
+      return c.json(result)
+    },
+  )
+
+export const ResearchRoutes: () => Hono = lazy(() =>
   new Hono()
     .get(
       "/",
@@ -400,6 +682,20 @@ export const ResearchRoutes = lazy(() =>
         const ledger = await ResearchAudit.inspect(Instance.directory)
         return c.json({ events: ledger.events, diagnostics: ledger.diagnostics, readOnly: ledger.readOnly })
       },
+    )
+    .get(
+      "/workflow",
+      describeRoute({
+        summary: "Derive the current SMAIRT cycle stage and valid next actions",
+        operationId: "research.workflow",
+        responses: {
+          200: {
+            description: "Signed-state-derived research workflow",
+            content: { "application/json": { schema: resolver(ResearchWorkflow) } },
+          },
+        },
+      }),
+      async (c) => c.json(await ResearchWorkflowService.derive(Instance.directory)),
     )
     .get(
       "/audits",
@@ -540,6 +836,7 @@ export const ResearchRoutes = lazy(() =>
       }),
       async (c) => c.json(await ProjectMembership.list(Instance.directory)),
     )
+    .route("/", CollaborationRoutes as Hono)
     .post(
       "/members",
       describeRoute({
@@ -1120,6 +1417,9 @@ export const ResearchRoutes = lazy(() =>
       }),
       async (c) => c.json(await ResearchEnvironmentService.list(Instance.directory)),
     )
+    // Keep the generated OpenAPI routes at runtime while preventing Hono's
+    // already-large research chain from exceeding TypeScript's instantiation limit.
+    .route("/", EnvironmentManagementRoutes as Hono)
     .post(
       "/environments/:trackId/isolate",
       describeRoute({

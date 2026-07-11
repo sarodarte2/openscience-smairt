@@ -5,7 +5,6 @@ import { cmd } from "./cmd"
 import { withNetworkOptions, resolveNetworkOptions } from "../network"
 import open from "open"
 import { openUrl } from "../../util/open-url"
-import { needsOnboarding, runOnboarding, isConfigured } from "../onboard"
 import fs from "fs/promises"
 import os from "os"
 import path from "path"
@@ -82,14 +81,6 @@ export const WebCommand = cmd({
     UI.println(UI.logo("  "))
     UI.empty()
 
-    // First launch on this machine with nothing configured → walk the user
-    // through setup (managed vs BYOK vs skip) before we bind the server, so
-    // the browser's first request already sees a usable model.
-    if (await needsOnboarding()) {
-      await runOnboarding()
-      UI.empty()
-    }
-
     // Run the dashboard sync BEFORE starting the server — and without
     // the 5s race timeout the global middleware uses. The model picker
     // and provider whitelist live in ~/.config/openscience/openscience-synced.json;
@@ -99,20 +90,7 @@ export const WebCommand = cmd({
     // catalogue. Doing it here, await-ed, guarantees the next browser
     // request sees the freshly-synced whitelist.
     const authed = await OpenScience.isAuthenticated()
-    if (!authed) {
-      // Only nudge when there's genuinely no way to run a model. A BYOK key
-      // (env var or `keys add`) is a first-class, account-free setup — don't
-      // badger those users to connect Atlas.
-      if (!(await isConfigured())) {
-        UI.println(UI.Style.TEXT_WARNING_BOLD + "  ⚠  No model configured", UI.Style.TEXT_NORMAL)
-        UI.println(
-          UI.Style.TEXT_NORMAL,
-          "  Run `openscience login` for Atlas managed models, or `openscience keys add` for your own key.",
-        )
-        UI.println(UI.Style.TEXT_DIM, "  Continuing with free demo models for now.")
-        UI.empty()
-      }
-    } else {
+    if (authed) {
       // Sync managed config before binding so the browser's first request sees
       // the fresh provider whitelist. But cap the wait: syncServices() has no
       // internal timeout, so a slow/unresponsive backend would otherwise hang
@@ -199,6 +177,8 @@ export const WebCommand = cmd({
 async function startLocalWorkspace(input: { apiPort: number }) {
   const repositoryRoot = fileURLToPath(new URL("../../../../../", import.meta.url))
   const workspaceRoot = path.join(repositoryRoot, "frontend/workspace")
+  const commit = Bun.spawnSync(["git", "rev-parse", "--short=12", "HEAD"], { cwd: repositoryRoot })
+  const revision = commit.exitCode === 0 ? commit.stdout.toString().trim() : "unknown"
   const configuredPort = Number(process.env.OPENSCIENCE_WORKSPACE_PORT ?? "3000")
   const port = Number.isInteger(configuredPort) && configuredPort > 0 && configuredPort < 65536 ? configuredPort : 3000
   if (input.apiPort === 4096) {
@@ -215,19 +195,20 @@ async function startLocalWorkspace(input: { apiPort: number }) {
         ...process.env,
         VITE_OPENSCIENCE_SERVER_HOST: "localhost",
         VITE_OPENSCIENCE_SERVER_PORT: String(input.apiPort),
+        VITE_OPENSCIENCE_BUILD_COMMIT: revision,
       },
     },
   )
-  await new Promise<void>((resolve, reject) => {
-    const timer = setTimeout(resolve, 900)
-    child.once("error", (error) => {
-      clearTimeout(timer)
-      reject(error)
-    })
-    child.once("exit", (code) => {
-      clearTimeout(timer)
-      reject(new Error(`Vite exited before startup (${code ?? "signal"})`))
-    })
-  })
-  return { process: child, url: `http://localhost:${port}` }
+  const url = `http://localhost:${port}`
+  await waitForWorkspace(url, child)
+  return { process: child, url }
+}
+
+async function waitForWorkspace(url: string, child: ChildProcess, attempt = 0): Promise<void> {
+  if (child.exitCode !== null) throw new Error(`Vite exited before startup (${child.exitCode})`)
+  const response = await fetch(url, { signal: AbortSignal.timeout(500) }).catch(() => null)
+  if (response?.ok) return
+  if (attempt >= 100) throw new Error("The local workspace did not become ready within 15 seconds")
+  await new Promise((resolve) => setTimeout(resolve, 150))
+  return waitForWorkspace(url, child, attempt + 1)
 }

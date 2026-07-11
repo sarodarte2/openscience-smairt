@@ -11,7 +11,7 @@ import {
   tool,
   jsonSchema,
 } from "ai"
-import { clone, mergeDeep, pipe } from "remeda"
+import { clone, mergeDeep } from "remeda"
 import { ProviderTransform } from "@/provider/transform"
 import { Config } from "@/config/config"
 import { Instance } from "@/project/instance"
@@ -22,6 +22,7 @@ import { SystemPrompt } from "./system"
 import { Flag } from "@/flag/flag"
 import { PermissionNext } from "@/permission/next"
 import { Auth } from "@/auth"
+import { ResearchNetworkPolicy } from "@/research/application/network"
 
 export namespace LLM {
   const log = Log.create({ service: "llm" })
@@ -62,6 +63,16 @@ export namespace LLM {
       Provider.getProvider(input.model.providerID),
       Auth.get(input.model.providerID),
     ])
+    await ResearchNetworkPolicy.assertModelRequest({
+      projectRoot: Instance.directory,
+      providerId: input.model.providerID,
+      baseURL:
+        typeof provider.options?.baseURL === "string"
+          ? provider.options.baseURL
+          : typeof provider.options?.baseUrl === "string"
+            ? provider.options.baseUrl
+            : undefined,
+    })
     const isCodex = provider.id === "openai" && auth?.type === "oauth"
 
     const system = []
@@ -115,12 +126,11 @@ export namespace LLM {
     // supportsPriorityProcessing (else the SDK drops it with a warning).
     const fast = !input.small && !!input.user.fast && /gpt-5\.5/.test(input.model.id.toLowerCase())
     const speed = fast ? { serviceTier: "priority" } : {}
-    const options: Record<string, any> = pipe(
-      base,
-      mergeDeep(input.model.options),
-      mergeDeep(input.agent.options),
-      mergeDeep(variant),
-      mergeDeep(speed),
+    // Iterative merging avoids an unbounded variadic type instantiation as the
+    // provider option catalog grows, while preserving Remeda's deep-merge semantics.
+    const options = [input.model.options, input.agent.options, variant, speed].reduce<Record<string, any>>(
+      (value, next) => mergeDeep(value, next as Record<string, any>),
+      base as Record<string, any>,
     )
     if (isCodex) {
       options.instructions = SystemPrompt.instructions()

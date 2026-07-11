@@ -1,6 +1,6 @@
 import { createSignal, Show, type JSX } from "solid-js"
 import { useDialog } from "@synsci/ui/context/dialog"
-import { FONT_MONO, FONT_SANS, FONT_SERIF } from "@/styles/tokens"
+import { FONT_SANS } from "@/styles/tokens"
 
 type Dialog = ReturnType<typeof useDialog>
 
@@ -16,7 +16,7 @@ function card(): JSX.CSSProperties {
     "max-width": "92vw",
     background: "var(--color-surface-solid)",
     border: "1px solid var(--color-border-strong)",
-    "border-radius": "4px",
+    "border-radius": "20px",
     "box-shadow": "var(--shadow-md)",
     overflow: "hidden",
   }
@@ -26,13 +26,14 @@ function actionBtn(primary = false, danger = false): JSX.CSSProperties {
   return {
     all: "unset",
     cursor: "pointer",
+    "min-height": "36px",
     padding: "7px 14px",
-    "border-radius": "4px",
+    "border-radius": "10px",
     border: primary ? "1px solid var(--color-accent)" : "1px solid var(--color-border)",
     background: danger ? "var(--color-error, #ef4444)" : primary ? "var(--color-accent)" : "var(--color-bg-elevated)",
     color: danger || primary ? "var(--color-on-accent)" : "var(--color-text)",
-    "font-family": FONT_MONO,
-    "font-size": "12px",
+    "font-family": FONT_SANS,
+    "font-size": "15px",
     "font-weight": 500,
   }
 }
@@ -53,7 +54,9 @@ export function confirmDialog(
       () => (
         <div style={card()}>
           <div style={{ padding: "18px 20px 8px" }}>
-            <div style={{ "font-family": FONT_SERIF, "font-size": "19px", color: "var(--color-text)" }}>
+            <div
+              style={{ "font-family": FONT_SANS, "font-size": "17px", "font-weight": 650, color: "var(--color-text)" }}
+            >
               {opts.title}
             </div>
             <Show when={opts.message}>
@@ -109,7 +112,9 @@ export function promptDialog(
       () => (
         <div style={card()}>
           <div style={{ padding: "18px 20px 8px" }}>
-            <div style={{ "font-family": FONT_SERIF, "font-size": "19px", color: "var(--color-text)" }}>
+            <div
+              style={{ "font-family": FONT_SANS, "font-size": "17px", "font-weight": 650, color: "var(--color-text)" }}
+            >
               {opts.title}
             </div>
             <Show when={opts.message}>
@@ -140,11 +145,11 @@ export function promptDialog(
                 "margin-top": "12px",
                 padding: "9px 10px",
                 border: "1px solid var(--color-border)",
-                "border-radius": "4px",
+                "border-radius": "10px",
                 background: "var(--color-bg)",
                 color: "var(--color-text)",
-                "font-family": FONT_MONO,
-                "font-size": "12px",
+                "font-family": FONT_SANS,
+                "font-size": "15px",
               }}
             />
           </div>
@@ -188,8 +193,9 @@ export function alertDialog(
           <div style={{ padding: "18px 20px 8px" }}>
             <div
               style={{
-                "font-family": FONT_SERIF,
-                "font-size": "19px",
+                "font-family": FONT_SANS,
+                "font-size": "17px",
+                "font-weight": 650,
                 color: opts.danger ? "var(--color-error, #ef4444)" : "var(--color-text)",
               }}
             >

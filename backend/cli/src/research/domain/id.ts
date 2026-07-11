@@ -19,6 +19,7 @@ export const ResearchIDKind = {
   event: "rse",
   approval: "rsv",
   claim: "rsl",
+  operation: "rso",
 } as const
 
 export type ResearchIDKind = keyof typeof ResearchIDKind

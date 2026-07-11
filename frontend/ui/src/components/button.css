@@ -4,7 +4,7 @@
   justify-content: center;
   border-style: solid;
   border-width: 1px;
-  border-radius: var(--radius-md);
+  border-radius: 10px;
   text-decoration: none;
   user-select: none;
   cursor: default;
@@ -118,7 +118,7 @@
   }
 
   &[data-size="small"] {
-    height: 22px;
+    height: 28px;
     padding: 0 8px;
     gap: 4px;
     &[data-icon] {
@@ -135,8 +135,8 @@
   }
 
   &[data-size="normal"] {
-    height: 24px;
-    line-height: 24px;
+    height: 36px;
+    line-height: 36px;
     padding: 0 10px;
     gap: 6px;
     &[data-icon] {
@@ -152,7 +152,7 @@
   }
 
   &[data-size="large"] {
-    height: 32px;
+    height: 44px;
     padding: 0 12px;
     gap: 6px;
 

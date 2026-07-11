@@ -1,7 +1,8 @@
 import path from "node:path"
 import { execFile } from "node:child_process"
 import { promisify } from "node:util"
-import { mkdir, readFile, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
+import { tmpdir } from "node:os"
 import { createHash } from "node:crypto"
 import { EnvironmentSnapshot } from "../../domain/schema"
 
@@ -23,19 +24,38 @@ export function environmentName(name: string) {
   return normalized || "openscience-project"
 }
 
-function manifest(name: string) {
+const packageName = /^[A-Za-z0-9_.-]+(?:[<>=!~]=?[A-Za-z0-9_.+*-]+)?$/
+
+function packages(values: string[]) {
+  const unique = [...new Set(values.map((value) => value.trim()).filter(Boolean))]
+  for (const value of unique) {
+    if (!packageName.test(value)) throw new Error(`Invalid environment package ${value}`)
+  }
+  return unique
+}
+
+export function environmentManifest(input: {
+  name: string
+  python?: string
+  condaPackages?: string[]
+  pipPackages?: string[]
+}) {
+  const conda = packages(input.condaPackages ?? [])
+  const pip = packages(input.pipPackages ?? [])
   return [
-    `name: ${name}`,
+    `name: ${input.name}`,
     "channels:",
     "  - conda-forge",
     "dependencies:",
-    "  - python=3.12",
+    `  - python=${input.python ?? "3.12"}`,
     "  - pip",
     "  - ipykernel",
     "  - jupyterlab",
     "  - nbclient=0.10.*",
     "  - nbformat=5.10.*",
     "  - nbconvert=7.16.*",
+    ...conda.map((value) => `  - ${value}`),
+    ...(pip.length ? ["  - pip:", ...pip.map((value) => `      - ${value}`)] : []),
     "",
   ].join("\n")
 }
@@ -90,18 +110,74 @@ function sanitizeExplicit(value: string) {
 }
 
 export namespace CondaEnvironment {
-  export async function prepare(input: { projectRoot: string; projectName: string; create: boolean }) {
+  export async function plan(input: {
+    name: string
+    python?: string
+    condaPackages?: string[]
+    pipPackages?: string[]
+    solve?: boolean
+  }) {
+    const content = environmentManifest(input)
+    if (!input.solve) return { content, specHash: digest(content), solve: { state: "not_requested" as const } }
+    const directory = await mkdtemp(path.join(tmpdir(), "openscience-conda-plan-"))
+    const file = path.join(directory, "environment.yml")
+    try {
+      await writeFile(file, content, { encoding: "utf8", mode: 0o600 })
+      await execute("conda", ["--version"], { encoding: "utf8" }).catch(() => {
+        throw new CondaUnavailableError()
+      })
+      const result = await execute("conda", ["env", "create", "--dry-run", "--json", "--file", file], {
+        encoding: "utf8",
+        timeout: 120_000,
+        maxBuffer: 8 * 1024 * 1024,
+      }).catch((error) => {
+        const stderr = error instanceof Error && "stderr" in error ? String(error.stderr) : ""
+        throw new Error(stderr.trim() || (error instanceof Error ? error.message : String(error)))
+      })
+      return { content, specHash: digest(content), solve: { state: "solvable" as const, output: result.stdout } }
+    } catch (error) {
+      if (error instanceof CondaUnavailableError) {
+        return {
+          content,
+          specHash: digest(content),
+          solve: { state: "conda_unavailable" as const, error: error.message },
+        }
+      }
+      return {
+        content,
+        specHash: digest(content),
+        solve: { state: "conflict" as const, error: error instanceof Error ? error.message : String(error) },
+      }
+    } finally {
+      await rm(directory, { recursive: true, force: true })
+    }
+  }
+
+  export async function prepare(input: {
+    projectRoot: string
+    projectName: string
+    create: boolean
+    python?: string
+    condaPackages?: string[]
+    pipPackages?: string[]
+    signal?: AbortSignal
+  }) {
     const name = environmentName(input.projectName)
     const directory = path.join(input.projectRoot, ".openscience/research")
     const file = path.join(directory, "environment.yml")
-    const content = manifest(name)
+    const content = environmentManifest({
+      name,
+      python: input.python,
+      condaPackages: input.condaPackages,
+      pipPackages: input.pipPackages,
+    })
     await mkdir(directory, { recursive: true })
     await writeFile(file, content, { mode: 0o644 })
     if (!input.create) return { name, file, specHash: digest(content), created: false }
     await execute("conda", ["--version"], { encoding: "utf8" }).catch(() => {
       throw new CondaUnavailableError()
     })
-    await execute("conda", ["env", "create", "--file", file, "--yes"], { encoding: "utf8" })
+    await execute("conda", ["env", "create", "--file", file, "--yes"], { encoding: "utf8", signal: input.signal })
     return { name, file, specHash: digest(content), created: true }
   }
 

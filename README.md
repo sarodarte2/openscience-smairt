@@ -41,7 +41,7 @@ npm install -g @synsci/openscience
 openscience
 ```
 
-The command is `openscience`, and it opens the workspace in your browser. The first time you run it, a short setup walks you through how to power the models — Atlas managed models, your own provider keys, or skip and start on the free demo models. If you would rather not install it globally, `npx synsci` does the same thing in a single step:
+The command is `openscience`, and it opens the workspace in your browser. Create or adopt a study from the GUI, then connect a provider with an API key, an advertised OAuth method, or a local OpenAI-compatible endpoint. Atlas is optional and appears only under Optional managed services. If you would rather not install it globally, `npx synsci` does the same thing in a single step:
 
 ```bash
 npx synsci
@@ -105,6 +105,11 @@ bun run --cwd backend/cli build
 
 `bun dev web <project>` starts both the local API and Vite workspace from source, opens the selected repository, and
 stops both processes together. `bun run --cwd backend/cli build` produces the platform binaries.
+
+Source development requires no reinstall: the workspace displays `Local source · <commit>` so you can confirm which
+frontend is visible. To test the globally installed `openscience` command, rebuild and reinstall the binary first; its
+About panel identifies the packaged version and commit. A mismatch badge is shown if a frontend is connected to a
+different backend build.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for how the system fits together, [CONTRIBUTING.md](CONTRIBUTING.md) for how to contribute, [AGENTS.md](AGENTS.md) for the style guide, and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for community standards.
 

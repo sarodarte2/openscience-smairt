@@ -31,6 +31,30 @@ export const ResearchProject = RecordBase.extend({
   defaultEnvironment: z.object({ kind: z.literal("conda"), name: z.string().min(1) }).strict(),
   coreTrackId: ResearchID.schema("track"),
   activeFoundationId: ResearchID.schema("foundation").nullable(),
+  profile: z
+    .object({
+      question: z.string().min(1).max(12000),
+      domain: z.string().min(1).max(120),
+      dataPhase: z.enum(["synthetic", "downloaded", "real"]),
+      license: z.enum(["MIT", "BSD-3-Clause", "Apache-2.0", "GPL-3.0", "proprietary"]),
+      paperWorkspace: z.literal(true),
+      networkMode: z.enum(["offline", "ask", "allowed"]),
+      egressPolicy: z.enum(["public", "restricted", "air-gapped"]),
+      hpc: z
+        .object({
+          enabled: z.boolean(),
+          scheduler: z.enum(["slurm", "pbs", "sge"]).optional(),
+          clusterName: z.string().max(200).optional(),
+          account: z.string().max(200).optional(),
+          partition: z.string().max(200).optional(),
+          modules: z.array(z.string().min(1).max(300)).default([]),
+          scratchPath: z.string().max(2000).optional(),
+          validated: z.literal(false),
+        })
+        .strict(),
+    })
+    .strict()
+    .optional(),
 }).strict()
 export type ResearchProject = z.infer<typeof ResearchProject>
 

@@ -43,6 +43,7 @@ export const { use: useServer, provider: ServerProvider } = createSimpleContext(
     const [state, setState] = createStore({
       active: "",
       healthy: undefined as boolean | undefined,
+      build: undefined as { version: string; channel: string; mode: "source" | "packaged"; commit: string } | undefined,
     })
 
     const healthy = () => state.healthy
@@ -103,8 +104,19 @@ export const { use: useServer, provider: ServerProvider } = createSimpleContext(
       })
       return sdk.global
         .health()
-        .then((x) => x.data?.healthy === true)
-        .catch(() => false)
+        .then((x) => {
+          const data = x.data as
+            | {
+                healthy: true
+                version: string
+                channel: string
+                mode: "source" | "packaged"
+                commit: string
+              }
+            | undefined
+          return data ?? null
+        })
+        .catch(() => null)
     }
 
     createEffect(() => {
@@ -127,7 +139,11 @@ export const { use: useServer, provider: ServerProvider } = createSimpleContext(
         void check(url)
           .then((next) => {
             if (!alive) return
-            setState("healthy", next)
+            setState("healthy", next?.healthy === true)
+            setState(
+              "build",
+              next ? { version: next.version, channel: next.channel, mode: next.mode, commit: next.commit } : undefined,
+            )
           })
           .finally(() => {
             busy = false
@@ -171,6 +187,9 @@ export const { use: useServer, provider: ServerProvider } = createSimpleContext(
     return {
       ready: isReady,
       healthy,
+      get build() {
+        return state.build
+      },
       isLocal,
       get url() {
         return state.active

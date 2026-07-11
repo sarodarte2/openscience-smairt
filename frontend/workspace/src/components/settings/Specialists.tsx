@@ -2,6 +2,8 @@ import { For, Show, createMemo, createResource, createSignal } from "solid-js"
 import { Icon } from "@synsci/ui/icon"
 import { IconButton } from "@synsci/ui/icon-button"
 import { showToast } from "@synsci/ui/toast"
+import { useDialog } from "@synsci/ui/context/dialog"
+import { confirmDialog } from "@/thesis/dialogs"
 import { useGlobalSDK } from "@/context/global-sdk"
 import { useGlobalSync } from "@/context/global-sync"
 import type { Agent, Config } from "@synsci/sdk/v2/client"
@@ -29,6 +31,7 @@ export default function Specialists() {
   const sdk = useGlobalSDK()
   const globalSDK = useGlobalSDK()
   const sync = useGlobalSync()
+  const dialog = useDialog()
 
   const [agents, agentsCtl] = createResource(async () => {
     const res = await sdk.client.app.agents()
@@ -89,7 +92,15 @@ export default function Specialists() {
   }
 
   async function deleteAgent(name: string) {
-    if (!window.confirm(`Delete custom specialist "${name}"? This removes it from your config.`)) return
+    if (
+      !(await confirmDialog(dialog, {
+        title: `Delete ${name}?`,
+        message: "This removes the custom specialist from your configuration.",
+        confirmLabel: "Delete",
+        danger: true,
+      }))
+    )
+      return
     setBusy(true)
     try {
       await globalSDK.client.global.configUnset({ path: ["agent", name] })

@@ -30,14 +30,28 @@ export const GlobalRoutes = lazy(() =>
             description: "Health information",
             content: {
               "application/json": {
-                schema: resolver(z.object({ healthy: z.literal(true), version: z.string() })),
+                schema: resolver(
+                  z.object({
+                    healthy: z.literal(true),
+                    version: z.string(),
+                    channel: z.string(),
+                    mode: z.enum(["source", "packaged"]),
+                    commit: z.string(),
+                  }),
+                ),
               },
             },
           },
         },
       }),
       async (c) => {
-        return c.json({ healthy: true, version: Installation.VERSION })
+        return c.json({
+          healthy: true,
+          version: Installation.VERSION,
+          channel: Installation.CHANNEL,
+          mode: Installation.isLocal() ? "source" : "packaged",
+          commit: Installation.COMMIT,
+        })
       },
     )
     .get(

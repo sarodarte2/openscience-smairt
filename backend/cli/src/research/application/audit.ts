@@ -14,6 +14,7 @@ import {
   RunAttempt,
   ScientificAnalysis,
   ScientificClaim,
+  TrackEnvironment,
   TrackReview,
 } from "../domain/schema"
 import type { ResearchEvent } from "../domain/event"
@@ -58,6 +59,8 @@ export interface ScientificDiagnostic {
     | "foundation_missing_event"
     | "foundation_environment_missing"
     | "active_foundation_missing"
+    | "environment_spec_missing"
+    | "environment_spec_hash_mismatch"
     | "projection_ledger_mismatch"
   file: string
   message: string
@@ -123,7 +126,7 @@ function requiredCapability(type: string): ResearchCapability | null {
   if (type === "track.created") return ResearchCapability.trackCreate
   if (type === "iteration.created") return ResearchCapability.iterationCreate
   if (type === "protocol.frozen") return ResearchCapability.protocolFreeze
-  if (type === "environment.diverged") return ResearchCapability.environmentManage
+  if (type === "environment.diverged" || type === "environment.updated") return ResearchCapability.environmentManage
   if (type.startsWith("run.")) return ResearchCapability.runExecute
   if (type === "artifact.registered" || type.startsWith("analysis.")) return ResearchCapability.analysisWrite
   if (type === "claim.finalized") return ResearchCapability.claimFinalize
@@ -160,7 +163,7 @@ export namespace ResearchAudit {
       }
       return values
     }
-    const [artifacts, analyses, claims, reviews, integrations, foundations, protocols, runs, iterations] =
+    const [artifacts, analyses, claims, reviews, integrations, foundations, protocols, runs, iterations, environments] =
       await Promise.all([
         loadDirectory(".openscience/research/artifacts", ArtifactManifest.parse),
         loadDirectory(".openscience/research/analyses", ScientificAnalysis.parse),
@@ -171,6 +174,7 @@ export namespace ResearchAudit {
         loadDirectory(".openscience/research/projections/protocols", ProtocolRevision.parse),
         loadDirectory(".openscience/research/projections/runs", RunAttempt.parse),
         loadDirectory(".openscience/research/iterations", ResearchIteration.parse),
+        loadDirectory(".openscience/research/projections/environments/tracks", TrackEnvironment.parse),
       ])
     const artifactById = new Map(artifacts.map((value) => [value.id, value]))
     const analysisById = new Map(analyses.map((value) => [value.id, value]))
@@ -196,6 +200,10 @@ export namespace ResearchAudit {
       for (const [key, result] of records) {
         if (result.success) signed.set(`${key}:${result.data.id}`, Canonical.hash(result.data))
       }
+      const environment = TrackEnvironment.safeParse(payload.environment)
+      if (environment.success) {
+        signed.set(`environment:${environment.data.trackId}`, Canonical.hash(environment.data))
+      }
     }
     const reconcile = (key: string, values: { id: string }[]) => {
       for (const value of values) {
@@ -213,6 +221,37 @@ export namespace ResearchAudit {
     reconcile("review", reviews)
     reconcile("integration", integrations)
     reconcile("foundation", foundations)
+    for (const environment of environments) {
+      if (signed.get(`environment:${environment.trackId}`) !== Canonical.hash(environment)) {
+        diagnostics.push({
+          code: "projection_ledger_mismatch",
+          file: environment.trackId,
+          message: "environment projection does not match its latest signed ledger record",
+        })
+      }
+      const file = path.resolve(canonicalRoot, environment.portableSpecPath)
+      const resolved = await realpath(file).catch(() => null)
+      if (
+        !resolved ||
+        path.relative(canonicalRoot, resolved).startsWith("..") ||
+        path.isAbsolute(path.relative(canonicalRoot, resolved))
+      ) {
+        diagnostics.push({
+          code: "environment_spec_missing",
+          file: environment.trackId,
+          message: `Missing or unsafe environment specification ${environment.portableSpecPath}`,
+        })
+        continue
+      }
+      const content = await readFile(resolved)
+      if (createHash("sha256").update(content).digest("hex") !== environment.portableSpecHash) {
+        diagnostics.push({
+          code: "environment_spec_hash_mismatch",
+          file: environment.trackId,
+          message: `Environment specification ${environment.portableSpecPath} differs from the signed record`,
+        })
+      }
+    }
     for (const artifact of artifacts) {
       const file = path.resolve(canonicalRoot, artifact.path)
       try {

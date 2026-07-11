@@ -10,6 +10,7 @@ import { Flag } from "../flag/flag"
 declare global {
   const OPENSCIENCE_VERSION: string
   const OPENSCIENCE_CHANNEL: string
+  const OPENSCIENCE_COMMIT: string
 }
 
 export namespace Installation {
@@ -197,6 +198,12 @@ export namespace Installation {
 
   export const VERSION = typeof OPENSCIENCE_VERSION === "string" ? OPENSCIENCE_VERSION : "local"
   export const CHANNEL = typeof OPENSCIENCE_CHANNEL === "string" ? OPENSCIENCE_CHANNEL : "local"
+  export const COMMIT = (() => {
+    if (typeof OPENSCIENCE_COMMIT === "string") return OPENSCIENCE_COMMIT
+    const root = path.resolve(import.meta.dir, "../../../..")
+    const result = Bun.spawnSync(["git", "rev-parse", "--short=12", "HEAD"], { cwd: root })
+    return result.exitCode === 0 ? result.stdout.toString().trim() : "unknown"
+  })()
   export const USER_AGENT = `openscience/${CHANNEL}/${VERSION}/${Flag.OPENSCIENCE_CLIENT}`
 
   /** OData query for the latest published version of a Chocolatey package.

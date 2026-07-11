@@ -3,6 +3,7 @@ import { Switch } from "@synsci/ui/switch"
 import { Icon } from "@synsci/ui/icon"
 import { IconButton } from "@synsci/ui/icon-button"
 import { showToast } from "@synsci/ui/toast"
+import { useDialog } from "@synsci/ui/context/dialog"
 import { useGlobalSync } from "@/context/global-sync"
 import { useGlobalSDK } from "@/context/global-sdk"
 import { StatusDot } from "@/thesis/shared/StatusDot"
@@ -21,6 +22,7 @@ import {
   FormField,
   FormButton,
 } from "./_shared"
+import { confirmDialog, promptDialog } from "@/thesis/dialogs"
 
 type McpConfig = NonNullable<Config["mcp"]>[string]
 type McpType = "local" | "remote"
@@ -34,6 +36,7 @@ function isConfigured(value: McpConfig | undefined): value is ConfiguredMcp {
 export default function Connectors() {
   const sync = useGlobalSync()
   const sdk = useGlobalSDK()
+  const dialog = useDialog()
 
   const [status, setStatus] = createSignal<Record<string, McpStatus>>({})
   const [search, setSearch] = createSignal("")
@@ -77,7 +80,15 @@ export default function Connectors() {
   }
 
   async function remove(name: string) {
-    if (!window.confirm(`Remove connector "${name}"? It will be disconnected and deleted from config.`)) return
+    if (
+      !(await confirmDialog(dialog, {
+        title: `Remove ${name}?`,
+        message: "It will be disconnected and deleted from configuration.",
+        confirmLabel: "Remove",
+        danger: true,
+      }))
+    )
+      return
     setBusy(true)
     try {
       await sdk.client.mcp.config.remove({ name, scope: "global" })
@@ -101,7 +112,11 @@ export default function Connectors() {
       const started = await sdk.client.mcp.auth.start({ name })
       const authUrl = started.data?.authorizationUrl
       if (authUrl) window.open(authUrl, "_blank", "noopener,noreferrer")
-      const code = window.prompt("Authorize in the opened tab, then paste the authorization code here.")
+      const code = await promptDialog(dialog, {
+        title: "Finish connector authorization",
+        message: "Authorize in the opened tab, then paste the authorization code here.",
+        confirmLabel: "Connect",
+      })
       if (!code) return
       await sdk.client.mcp.auth.callback({ name, code })
       await refresh()

@@ -17,6 +17,8 @@ import { useServer } from "@/context/server"
 import { FONT_CODE, FONT_SANS } from "@/styles/tokens"
 import { AppearanceSections } from "../settings-general"
 import { settingsApi } from "./api"
+import { useDialog } from "@synsci/ui/context/dialog"
+import { confirmDialog } from "@/thesis/dialogs"
 
 type Account = {
   session?: boolean
@@ -44,6 +46,7 @@ export default function General() {
   const models = useModels()
   const platform = usePlatform()
   const server = useServer()
+  const dialog = useDialog()
 
   const fetchFn = () => platform.fetch ?? fetch
   const base = () => server.url
@@ -82,7 +85,15 @@ export default function General() {
   }
 
   const signOut = async () => {
-    if (!window.confirm("Disconnect this local server from OpenScience?")) return
+    if (
+      !(await confirmDialog(dialog, {
+        title: "Disconnect this local server?",
+        message: "Local project data and BYOK credentials remain on this machine.",
+        confirmLabel: "Disconnect",
+        danger: true,
+      }))
+    )
+      return
     setBusy(true)
     try {
       const res = await sdk.client.account.logout()
@@ -241,6 +252,23 @@ export default function General() {
 
         {/* Appearance / theme / notifications / sounds / updates */}
         <AppearanceSections />
+
+        <Section title="About" description="Use this identifier when reporting a source or packaged UI problem.">
+          <div class="border border-border-weak-base rounded-[14px] overflow-hidden bg-surface-base/40">
+            <Row title="Frontend build">
+              <span class="text-13-regular text-text-strong">
+                {__OPENSCIENCE_BUILD_VERSION__} · {__OPENSCIENCE_BUILD_MODE__} · {__OPENSCIENCE_BUILD_COMMIT__}
+              </span>
+            </Row>
+            <Row title="Local server">
+              <span class="text-13-regular text-text-strong">
+                {server.build
+                  ? `${server.build.version} · ${server.build.mode} · ${server.build.commit}`
+                  : "Disconnected"}
+              </span>
+            </Row>
+          </div>
+        </Section>
       </div>
     </div>
   )

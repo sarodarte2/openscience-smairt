@@ -1,6 +1,8 @@
 import { For, Show, createResource, createSignal, onCleanup, type JSX } from "solid-js"
 import { createStore } from "solid-js/store"
 import { useSDK } from "@/context/sdk"
+import { useDialog } from "@synsci/ui/context/dialog"
+import { confirmDialog } from "@/thesis/dialogs"
 import { FONT_MONO, FONT_SANS } from "@/styles/tokens"
 
 interface Member {
@@ -33,8 +35,9 @@ async function response<T>(request: Promise<Response>): Promise<T> {
   throw new Error(body.message || body.error || `Request failed (${value.status})`)
 }
 
-export function TrustPanel(props: { disabled?: boolean }): JSX.Element {
+export function TrustPanel(props: { disabled?: boolean; section?: "all" | "people" | "publications" }): JSX.Element {
   const sdk = useSDK()
+  const dialog = useDialog()
   const endpoint = (path: string) =>
     `${sdk.url.replace(/\/$/, "")}/research${path}?directory=${encodeURIComponent(sdk.directory)}`
   const [members, { refetch: refetchMembers }] = createResource(() => response<Member[]>(fetch(endpoint("/members"))))
@@ -43,11 +46,20 @@ export function TrustPanel(props: { disabled?: boolean }): JSX.Element {
   )
   const [claims] = createResource(() => response<Claim[]>(fetch(endpoint("/claims"))))
   const [audit, { refetch: refetchAudit }] = createResource(() => response<Audit>(fetch(endpoint("/audits"))))
-  const [mode, setMode] = createSignal<"member" | "publication" | "export" | "">("")
+  const [mode, setMode] = createSignal<"member" | "join" | "publication" | "export" | "">("")
   const [busy, setBusy] = createSignal(false)
   const [error, setError] = createSignal("")
   const [notice, setNotice] = createSignal("")
-  const [member, setMember] = createStore({ displayName: "", email: "", memberRole: "researcher", signingKeyId: "" })
+  const [member, setMember] = createStore({ bundle: "", memberRole: "researcher" })
+  const [join, setJoin] = createStore({ displayName: "", email: "" })
+  const [joinBundle, setJoinBundle] = createSignal("")
+  const [verifiedJoin, setVerifiedJoin] = createSignal<{
+    bundle: string
+    displayName: string
+    email?: string
+    signingKeyId: string
+    issuedAt: string
+  }>()
   const [publication, setPublication] = createStore({
     title: "",
     abstract: "",
@@ -56,6 +68,9 @@ export function TrustPanel(props: { disabled?: boolean }): JSX.Element {
     contributionStatement: "Contributions are attributed from the signed project membership and research ledger.",
   })
   const [destination, setDestination] = createSignal("")
+  const section = () => props.section ?? "all"
+  const showPeople = () => section() === "all" || section() === "people"
+  const showPublications = () => section() === "all" || section() === "publications"
 
   const refresh = () => Promise.all([refetchMembers(), refetchPublications(), refetchAudit()])
   const memberSubscription = sdk.event.on("research.member.updated", () => void refresh())
@@ -86,28 +101,94 @@ export function TrustPanel(props: { disabled?: boolean }): JSX.Element {
     }
   }
 
+  const createJoinRequest = async (event: SubmitEvent) => {
+    event.preventDefault()
+    setBusy(true)
+    setError("")
+    setNotice("")
+    try {
+      const result = await response<{ bundle: string }>(
+        fetch(endpoint("/collaboration/join-request"), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ displayName: join.displayName, email: join.email || undefined }),
+        }),
+      )
+      setJoinBundle(result.bundle)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const previewJoinRequest = async () => {
+    setBusy(true)
+    setError("")
+    try {
+      const request = await response<Omit<NonNullable<ReturnType<typeof verifiedJoin>>, "bundle">>(
+        fetch(endpoint("/collaboration/join-request/preview"), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ bundle: member.bundle }),
+        }),
+      )
+      setVerifiedJoin({ bundle: member.bundle, ...request })
+    } catch (cause) {
+      setVerifiedJoin(undefined)
+      setError(cause instanceof Error ? cause.message : String(cause))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const removeMember = async (value: Member) => {
+    const confirmed = await confirmDialog(dialog, {
+      title: `Remove ${value.displayName}?`,
+      message: "Future project actions from this identity will be rejected. Historical attribution is preserved.",
+      confirmLabel: "Remove",
+      danger: true,
+    })
+    if (confirmed) await mutate(`/members/${value.id}`, "DELETE", {})
+  }
+
   return (
     <section style={shell}>
       <div style={heading}>
         <div>
-          <div style={title}>Trust, people & publication</div>
-          <div style={subtitle}>Local authority, explicit roles, honest exports, and evidence-linked writing.</div>
+          <div style={title}>
+            {section() === "people" ? "People & roles" : section() === "publications" ? "Publications" : "Trust record"}
+          </div>
+          <div style={subtitle}>
+            {section() === "people"
+              ? "Local authority, explicit roles, and signed collaboration."
+              : section() === "publications"
+                ? "Evidence-linked writing, contribution disclosure, and human approval."
+                : "Verified local authority and honest export."}
+          </div>
         </div>
         <span style={{ ...badge, color: audit()?.valid ? "var(--color-success)" : "var(--color-danger)" }}>
           {audit()?.valid ? "verified" : `${audit()?.diagnostics.length ?? 0} findings`}
         </span>
       </div>
       <div style={actions}>
-        <button style={button} disabled={props.disabled} onClick={() => setMode(mode() === "member" ? "" : "member")}>
-          Add person
-        </button>
-        <button
-          style={button}
-          disabled={props.disabled}
-          onClick={() => setMode(mode() === "publication" ? "" : "publication")}
-        >
-          Draft publication
-        </button>
+        <Show when={showPeople()}>
+          <button style={button} disabled={props.disabled} onClick={() => setMode(mode() === "member" ? "" : "member")}>
+            Accept join request
+          </button>
+          <button style={button} onClick={() => setMode(mode() === "join" ? "" : "join")}>
+            Create my join request
+          </button>
+        </Show>
+        <Show when={showPublications()}>
+          <button
+            style={button}
+            disabled={props.disabled}
+            onClick={() => setMode(mode() === "publication" ? "" : "publication")}
+          >
+            Draft publication
+          </button>
+        </Show>
         <button style={button} onClick={() => setMode(mode() === "export" ? "" : "export")}>
           Export study
         </button>
@@ -127,16 +208,35 @@ export function TrustPanel(props: { disabled?: boolean }): JSX.Element {
           style={form}
           onSubmit={(event) => {
             event.preventDefault()
-            void mutate("/members", "POST", { ...member, email: member.email || undefined })
+            void mutate("/members/import", "POST", member)
           }}
         >
-          <Field label="Name" value={member.displayName} onInput={(value) => setMember("displayName", value)} />
           <Field
-            label="Email — optional"
-            value={member.email}
-            onInput={(value) => setMember("email", value)}
-            required={false}
+            label="Signed join request"
+            value={member.bundle}
+            onInput={(value) => {
+              setMember("bundle", value)
+              setVerifiedJoin(undefined)
+            }}
+            multiline
           />
+          <button
+            type="button"
+            style={button}
+            disabled={busy() || !member.bundle.trim()}
+            onClick={() => void previewJoinRequest()}
+          >
+            Verify request
+          </button>
+          <Show when={verifiedJoin()}>
+            {(request) => (
+              <div style={note} role="status">
+                Verified request from {request().displayName}
+                {request().email ? ` · ${request().email}` : ""} · signed{" "}
+                {new Date(request().issuedAt).toLocaleString()} · key {request().signingKeyId.slice(0, 20)}…
+              </div>
+            )}
+          </Show>
           <label style={label}>
             Role
             <select
@@ -149,14 +249,40 @@ export function TrustPanel(props: { disabled?: boolean }): JSX.Element {
               </For>
             </select>
           </label>
+          <button style={primary} disabled={busy() || verifiedJoin()?.bundle !== member.bundle}>
+            Verify and add person
+          </button>
+        </form>
+      </Show>
+      <Show when={mode() === "join"}>
+        <form style={form} onSubmit={(event) => void createJoinRequest(event)}>
+          <Field label="Your name" value={join.displayName} onInput={(value) => setJoin("displayName", value)} />
           <Field
-            label="Signing-key fingerprint"
-            value={member.signingKeyId}
-            onInput={(value) => setMember("signingKeyId", value)}
+            label="Email — optional"
+            value={join.email}
+            onInput={(value) => setJoin("email", value)}
+            required={false}
           />
           <button style={primary} disabled={busy()}>
-            Sign membership
+            Create signed request
           </button>
+          <Show when={joinBundle()}>
+            <Field
+              label="Send this request to a project owner"
+              value={joinBundle()}
+              onInput={setJoinBundle}
+              multiline
+            />
+            <button
+              type="button"
+              style={button}
+              onClick={() =>
+                void navigator.clipboard.writeText(joinBundle()).then(() => setNotice("Join request copied."))
+              }
+            >
+              Copy request
+            </button>
+          </Show>
         </form>
       </Show>
       <Show when={mode() === "publication"}>
@@ -230,43 +356,64 @@ export function TrustPanel(props: { disabled?: boolean }): JSX.Element {
         </form>
       </Show>
       <div style={grid}>
-        <div>
-          <div style={sectionTitle}>People</div>
-          <For each={(members() ?? []).filter((value) => value.active)}>
-            {(value) => (
-              <div style={row}>
-                <span>{value.displayName}</span>
-                <span style={badge}>{value.role}</span>
-              </div>
-            )}
-          </For>
-        </div>
-        <div>
-          <div style={sectionTitle}>Publications</div>
-          <For each={publications() ?? []} fallback={<div style={empty}>No publication drafts yet.</div>}>
-            {(value) => (
-              <div style={row}>
-                <span>{value.title}</span>
-                <Show
-                  when={value.state === "draft" && value.supportState === "approved"}
-                  fallback={
-                    <span style={badge}>
-                      {value.state} · {value.supportState}
-                    </span>
-                  }
-                >
-                  <button
-                    style={button}
-                    disabled={busy() || props.disabled}
-                    onClick={() => void mutate(`/publications/${value.id}/approve`, "POST", {})}
+        <Show when={showPeople()}>
+          <div>
+            <div style={sectionTitle}>People</div>
+            <For each={(members() ?? []).filter((value) => value.active)}>
+              {(value) => (
+                <div style={row}>
+                  <span>{value.displayName}</span>
+                  <div style={{ display: "flex", gap: "6px", "align-items": "center" }}>
+                    <select
+                      aria-label={`Role for ${value.displayName}`}
+                      style={{ ...input, width: "auto", padding: "5px 7px", "font-size": "11px" }}
+                      value={value.role}
+                      disabled={busy() || props.disabled}
+                      onChange={(event) =>
+                        void mutate(`/members/${value.id}/role`, "PATCH", { newRole: event.currentTarget.value })
+                      }
+                    >
+                      <For each={["owner", "researcher", "reviewer", "viewer"]}>
+                        {(role) => <option value={role}>{role}</option>}
+                      </For>
+                    </select>
+                    <button style={button} disabled={busy() || props.disabled} onClick={() => void removeMember(value)}>
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              )}
+            </For>
+          </div>
+        </Show>
+        <Show when={showPublications()}>
+          <div>
+            <div style={sectionTitle}>Publications</div>
+            <For each={publications() ?? []} fallback={<div style={empty}>No publication drafts yet.</div>}>
+              {(value) => (
+                <div style={row}>
+                  <span>{value.title}</span>
+                  <Show
+                    when={value.state === "draft" && value.supportState === "approved"}
+                    fallback={
+                      <span style={badge}>
+                        {value.state} · {value.supportState}
+                      </span>
+                    }
                   >
-                    Approve
-                  </button>
-                </Show>
-              </div>
-            )}
-          </For>
-        </div>
+                    <button
+                      style={button}
+                      disabled={busy() || props.disabled}
+                      onClick={() => void mutate(`/publications/${value.id}/approve`, "POST", {})}
+                    >
+                      Approve
+                    </button>
+                  </Show>
+                </div>
+              )}
+            </For>
+          </div>
+        </Show>
       </div>
     </section>
   )

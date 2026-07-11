@@ -3,11 +3,13 @@
 // Backed by /settings/storage (routes/settings/storage.ts).
 import { type Component, type JSX, For, Show, createMemo, createSignal, onMount } from "solid-js"
 import { Button } from "@synsci/ui/button"
+import { useDialog } from "@synsci/ui/context/dialog"
 import { useGlobalSDK } from "@/context/global-sdk"
 import { usePlatform } from "@/context/platform"
 import { FONT_CODE, FONT_SANS } from "@/styles/tokens"
 import { settingsApi } from "./api"
 import { useSettingsNav } from "./nav"
+import { promptDialog } from "@/thesis/dialogs"
 
 type Entry = { name: string; path: string; bytes: number; kind: "dir" | "file" }
 type Usage = {
@@ -36,6 +38,7 @@ export const Storage: Component = () => {
   const sdk = useGlobalSDK()
   const platform = usePlatform()
   const navigate = useSettingsNav()
+  const dialog = useDialog()
 
   const base = () => sdk.url
   const fetchFn = () => platform.fetch ?? fetch
@@ -64,7 +67,13 @@ export const Storage: Component = () => {
       const picked = await platform.openDirectoryPickerDialog({ title: "Choose a new data location" }).catch(() => null)
       target = Array.isArray(picked) ? picked[0] : (picked ?? undefined)
     } else {
-      target = window.prompt("New absolute path for the data directory:") ?? undefined
+      target =
+        (await promptDialog(dialog, {
+          title: "Choose a new data location",
+          message: "Enter an absolute path for the OpenScience data directory.",
+          placeholder: "/path/to/openscience-data",
+          confirmLabel: "Continue",
+        })) ?? undefined
     }
     if (!target?.trim()) return
     setBusy(true)

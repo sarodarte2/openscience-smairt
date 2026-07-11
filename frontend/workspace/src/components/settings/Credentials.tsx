@@ -5,11 +5,14 @@ import { type Component, type JSX, For, Show, createMemo, createSignal, onMount 
 import { Button } from "@synsci/ui/button"
 import type { Provider } from "@synsci/sdk/v2/client"
 import { useGlobalSDK } from "@/context/global-sdk"
+import { useGlobalSync } from "@/context/global-sync"
 import { usePlatform } from "@/context/platform"
+import { useDialog } from "@synsci/ui/context/dialog"
 import { useProviders } from "@/hooks/use-providers"
 import { FONT_CODE, FONT_SANS, sectionTitle } from "@/styles/tokens"
 import { StatusDot } from "@/thesis/shared/StatusDot"
 import { settingsApi } from "./api"
+import { confirmDialog } from "@/thesis/dialogs"
 
 type FieldSpec = {
   name: string
@@ -28,18 +31,6 @@ type Service = {
   set_fields: string[]
   updated_at: string | null
 }
-
-const PROVIDER_LABEL: Record<string, string> = {
-  anthropic: "Anthropic",
-  openai: "OpenAI",
-  google: "Google",
-  openrouter: "OpenRouter",
-  groq: "Groq",
-  mistral: "Mistral",
-  xai: "xAI",
-  deepseek: "DeepSeek",
-}
-const BYOK_PROVIDERS = ["anthropic", "openai", "google", "openrouter", "groq", "mistral", "xai", "deepseek"] as const
 
 // Where a connected provider's credential actually lives. Only "api" keys sit in
 // the local auth store — the others reappear after a remove, so remove is gated.
@@ -64,7 +55,9 @@ const SOURCE_INFO: Record<Provider["source"], { label: string; removable: boolea
 
 export const Credentials: Component = () => {
   const sdk = useGlobalSDK()
+  const sync = useGlobalSync()
   const platform = usePlatform()
+  const dialog = useDialog()
   const providers = useProviders()
 
   const base = () => sdk.url
@@ -118,8 +111,13 @@ export const Credentials: Component = () => {
   }
 
   const disconnect = async (id: string) => {
-    if (!window.confirm(`Remove stored credentials for ${id}? This deletes the encrypted secrets from this machine.`))
-      return
+    const confirmed = await confirmDialog(dialog, {
+      title: "Remove stored credentials?",
+      message: `This deletes the encrypted secrets for ${id} from this machine.`,
+      confirmLabel: "Remove",
+      danger: true,
+    })
+    if (!confirmed) return
     setError(undefined)
     try {
       const res = await settingsApi<{ services: Service[] }>(
@@ -167,10 +165,25 @@ export const Credentials: Component = () => {
   }
 
   // ── BYOK provider keys ──
-  const [keyProvider, setKeyProvider] = createSignal<string>(BYOK_PROVIDERS[0])
+  const [keyProvider, setKeyProvider] = createSignal("")
   const [keyValue, setKeyValue] = createSignal("")
   const [savingKey, setSavingKey] = createSignal(false)
   const connectedProviders = createMemo(() => providers.connected().filter((p) => p.id !== "synsci"))
+  const providerOptions = createMemo(() =>
+    providers
+      .all()
+      .filter((provider) => provider.id !== "synsci")
+      .sort((a, b) => a.name.localeCompare(b.name)),
+  )
+  const selectedProvider = () => keyProvider() || providerOptions()[0]?.id || ""
+  const authMethods = () => sync.data.provider_auth?.[selectedProvider()] ?? []
+  const [oauth, setOauth] = createSignal<{
+    providerID: string
+    method: number
+    mode: "auto" | "code"
+    instructions: string
+  }>()
+  const [oauthCode, setOauthCode] = createSignal("")
   // The list endpoint's generated type omits `source`, but the payload carries it
   // for every connected provider (see Provider in @synsci/sdk/v2/client).
   const sourceInfo = (p: { id: string }) => SOURCE_INFO[(p as { source?: Provider["source"] }).source ?? "api"]
@@ -181,7 +194,7 @@ export const Credentials: Component = () => {
     setSavingKey(true)
     setError(undefined)
     try {
-      await sdk.client.auth.set({ providerID: keyProvider(), auth: { type: "api", key } })
+      await sdk.client.auth.set({ providerID: selectedProvider(), auth: { type: "api", key } })
       setKeyValue("")
       await sdk.client.global.sync()
     } catch (err) {
@@ -191,13 +204,64 @@ export const Credentials: Component = () => {
     }
   }
   const removeKey = async (providerID: string) => {
-    if (!window.confirm(`Remove the ${PROVIDER_LABEL[providerID] ?? providerID} key from this machine?`)) return
+    const provider = providerOptions().find((value) => value.id === providerID)
+    const confirmed = await confirmDialog(dialog, {
+      title: `Disconnect ${provider?.name ?? providerID}?`,
+      message:
+        "This removes locally stored provider credentials from this machine. Environment and config credentials must be removed at their source.",
+      confirmLabel: "disconnect",
+      danger: true,
+    })
+    if (!confirmed) return
     setError(undefined)
     try {
       await sdk.client.auth.remove({ providerID })
       await sdk.client.global.sync()
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
+    }
+  }
+  const authorize = async (method: number) => {
+    const providerID = selectedProvider()
+    setSavingKey(true)
+    setError(undefined)
+    try {
+      const result = await settingsApi<{ url: string; method: "auto" | "code"; instructions: string }>(
+        base(),
+        fetchFn(),
+        `/provider/${encodeURIComponent(providerID)}/oauth/authorize`,
+        { method: "POST", body: JSON.stringify({ method }) },
+      )
+      const destination = new URL(result.url)
+      const local = ["localhost", "127.0.0.1", "::1"].includes(destination.hostname)
+      if (destination.protocol !== "https:" && !(destination.protocol === "http:" && local)) {
+        throw new Error("Provider authorization must use HTTPS or a loopback HTTP callback")
+      }
+      setOauth({ providerID, method, mode: result.method, instructions: result.instructions })
+      platform.openLink(destination.href)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setSavingKey(false)
+    }
+  }
+  const completeOauth = async () => {
+    const current = oauth()
+    if (!current) return
+    setSavingKey(true)
+    setError(undefined)
+    try {
+      await settingsApi(base(), fetchFn(), `/provider/${encodeURIComponent(current.providerID)}/oauth/callback`, {
+        method: "POST",
+        body: JSON.stringify({ method: current.method, ...(current.mode === "code" ? { code: oauthCode() } : {}) }),
+      })
+      setOauth(undefined)
+      setOauthCode("")
+      await sdk.client.global.sync()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setSavingKey(false)
     }
   }
 
@@ -207,8 +271,8 @@ export const Credentials: Component = () => {
         <div class="flex flex-col gap-1 px-4 py-8 sm:p-8 max-w-[760px]">
           <h2 class="text-16-medium text-text-strong">Credentials</h2>
           <p class="text-13-regular text-text-weak">
-            Connect external services and provider keys. Secrets are encrypted on this machine and never shown again
-            after you save them.
+            External-service secrets are encrypted and write-only. Provider keys and OAuth tokens use the local,
+            owner-readable auth store; environment/config credentials remain at their source.
           </p>
         </div>
       </div>
@@ -419,13 +483,13 @@ export const Credentials: Component = () => {
           </Show>
         </div>
 
-        {/* Provider keys (BYOK) */}
+        {/* Model providers — full server-advertised catalogue */}
         <div class="flex flex-col gap-3">
           <div class="flex flex-col gap-1">
-            <h3 class="text-13-medium text-text-weak tracking-wide">Provider keys</h3>
+            <h3 class="text-13-medium text-text-weak tracking-wide">Model providers</h3>
             <p class="text-12-regular text-text-weak">
-              Bring your own model-provider API keys. Stored on this machine, billed directly by each provider — free
-              and unmetered here.
+              Connect any provider advertised by the local server using its available API-key or OAuth methods. Managed
+              services remain in their optional settings section.
             </p>
           </div>
 
@@ -440,11 +504,11 @@ export const Credentials: Component = () => {
             <label class="flex flex-col gap-1 sm:w-[180px]">
               <span style={eyebrow()}>Provider</span>
               <select
-                value={keyProvider()}
+                value={selectedProvider()}
                 onChange={(e) => setKeyProvider(e.currentTarget.value)}
                 style={fieldStyle()}
               >
-                <For each={BYOK_PROVIDERS}>{(id) => <option value={id}>{PROVIDER_LABEL[id] ?? id}</option>}</For>
+                <For each={providerOptions()}>{(provider) => <option value={provider.id}>{provider.name}</option>}</For>
               </select>
             </label>
             <label class="flex flex-col gap-1 flex-1 min-w-0">
@@ -470,6 +534,59 @@ export const Credentials: Component = () => {
             </Button>
           </form>
 
+          <Show when={authMethods().some((method) => method.type === "oauth")}>
+            <div class="os-provider-methods">
+              <div>
+                <strong>Sign-in methods</strong>
+                <span>OAuth credentials stay in the local OpenScience credential store.</span>
+              </div>
+              <For each={authMethods()}>
+                {(method, index) => (
+                  <Show when={method.type === "oauth"}>
+                    <Button
+                      size="normal"
+                      variant="secondary"
+                      disabled={savingKey()}
+                      onClick={() => void authorize(index())}
+                    >
+                      {method.label}
+                    </Button>
+                  </Show>
+                )}
+              </For>
+            </div>
+          </Show>
+
+          <Show when={oauth()}>
+            {(current) => (
+              <div class="os-oauth-card" role="status">
+                <strong>Complete sign-in in the opened browser tab</strong>
+                <p>{current().instructions}</p>
+                <Show when={current().mode === "code"}>
+                  <input
+                    value={oauthCode()}
+                    onInput={(event) => setOauthCode(event.currentTarget.value)}
+                    placeholder="Authorization code"
+                    style={fieldStyle()}
+                  />
+                </Show>
+                <div class="flex gap-2">
+                  <Button
+                    size="normal"
+                    variant="primary"
+                    disabled={savingKey() || (current().mode === "code" && !oauthCode().trim())}
+                    onClick={() => void completeOauth()}
+                  >
+                    I completed authorization
+                  </Button>
+                  <Button size="normal" variant="ghost" onClick={() => setOauth(undefined)}>
+                    cancel
+                  </Button>
+                </div>
+              </div>
+            )}
+          </Show>
+
           <Show when={connectedProviders().length > 0}>
             <div style={{ border: "1px solid var(--color-border)", "border-radius": "4px", overflow: "hidden" }}>
               <For each={connectedProviders()}>
@@ -477,7 +594,7 @@ export const Credentials: Component = () => {
                   <div class="flex items-center justify-between gap-3 px-4 py-3.5 border-b border-border-weak-base last:border-none">
                     <div class="flex items-center gap-2.5 min-w-0">
                       <StatusDot status="active" />
-                      <span class="text-13-regular text-text-strong truncate">{PROVIDER_LABEL[p.id] ?? p.id}</span>
+                      <span class="text-13-regular text-text-strong truncate">{p.name}</span>
                       <span
                         class="flex-shrink-0 px-2 py-0.5 rounded-full text-11-regular border"
                         style={{

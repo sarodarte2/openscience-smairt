@@ -65,6 +65,9 @@ export namespace ResearchProjectService {
     actor: Actor
     signer: Signer
     createCondaEnvironment?: boolean
+    profile?: ResearchProject["profile"]
+    environment?: { python?: string; condaPackages?: string[]; pipPackages?: string[] }
+    signal?: AbortSignal
   }) {
     if (input.actor.kind !== "human") throw new Error("A human owner must initialize a research project")
     const requested = path.resolve(input.directory)
@@ -81,6 +84,10 @@ export namespace ResearchProjectService {
       projectRoot: git.root,
       projectName: input.name,
       create: input.createCondaEnvironment ?? true,
+      python: input.environment?.python,
+      condaPackages: input.environment?.condaPackages,
+      pipPackages: input.environment?.pipPackages,
+      signal: input.signal,
     })
     const project = ResearchProject.parse({
       schemaVersion: 1,
@@ -91,6 +98,7 @@ export namespace ResearchProjectService {
       defaultEnvironment: { kind: "conda", name: environment.name },
       coreTrackId,
       activeFoundationId: null,
+      ...(input.profile ? { profile: input.profile } : {}),
       createdAt: now,
       createdBy: input.actor,
     })

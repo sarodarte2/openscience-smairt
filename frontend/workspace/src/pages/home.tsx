@@ -25,6 +25,8 @@ import { CommandPalette } from "@/thesis/CommandPalette"
 import { HelpOverlay } from "@/thesis/HelpOverlay"
 import { projectPrefs } from "@/thesis/store/projectPrefs"
 import { IconStar, IconStarFilled, IconTrash } from "@/thesis/shared/Icon"
+import { BuildBadge } from "@/thesis/BuildBadge"
+import { ScaffoldWizard } from "@/thesis/ScaffoldWizard"
 import {
   IconArrowRight,
   IconClock,
@@ -176,9 +178,13 @@ export default function Home(): JSX.Element {
     dialog.show(() => <FolderPicker onSelect={resolveResult} />, { onClose: () => resolveResult(null), lite: true })
   }
 
+  function createStudy() {
+    dialog.show(() => <ScaffoldWizard home={homedir()} onCreated={openProject} />)
+  }
+
   const isDark = () => theme.mode() === "dark"
   const cycleScheme = () => theme.setColorScheme(isDark() ? "light" : "dark")
-  useGlobalKeys({ onNew: () => void chooseProject() })
+  useGlobalKeys({ onNew: createStudy })
 
   return (
     <div
@@ -228,29 +234,14 @@ export default function Home(): JSX.Element {
           />
         </div>
         <FdaBanner />
-        <button
-          onClick={chooseProject}
-          title="open folder (⌘O)"
-          style={{
-            all: "unset",
-            cursor: "pointer",
-            display: "inline-flex",
-            "align-items": "center",
-            gap: "6px",
-            height: "32px",
-            "box-sizing": "border-box",
-            padding: "0 14px",
-            "border-radius": "4px",
-            background: "var(--color-accent)",
-            color: "var(--color-on-accent)",
-            "font-family": FONT_SANS,
-            "font-size": "13px",
-            "font-weight": 400,
-            "box-shadow": "var(--shadow-sm)",
-          }}
-        >
+        <BuildBadge />
+        <button class="os-button" onClick={chooseProject} title="open or adopt an existing study">
+          <IconFolder size={13} strokeWidth={1.6} />
+          open or adopt
+        </button>
+        <button class="os-button os-button--primary" onClick={createStudy} title="create study (⌘N)">
           <IconPlus size={12} strokeWidth={2} />
-          open project folder
+          create study
         </button>
         <HeaderIconButton onClick={cycleScheme} title="toggle theme">
           <Show when={isDark()} fallback={<IconMoon size={13} strokeWidth={1.5} />}>
@@ -309,7 +300,7 @@ export default function Home(): JSX.Element {
           "box-sizing": "border-box",
         }}
       >
-        <Show when={projects().length > 0} fallback={<EmptyHero onChoose={chooseProject} />}>
+        <Show when={projects().length > 0} fallback={<EmptyHero onCreate={createStudy} onOpen={chooseProject} />}>
           <div
             style={{
               display: "flex",
@@ -409,7 +400,7 @@ export default function Home(): JSX.Element {
                     />
                   )}
                 </For>
-                <NewProjectCard onClick={chooseProject} />
+                <NewProjectCard onClick={createStudy} />
               </div>
             </Show>
           </Show>
@@ -884,12 +875,12 @@ function NewProjectCard(props: { onClick: () => void }): JSX.Element {
       }}
     >
       <IconPlus size={15} strokeWidth={2} />
-      <span style={{ "font-family": FONT_SANS, "font-size": "13px", "font-weight": 400 }}>open project folder</span>
+      <span style={{ "font-family": FONT_SANS, "font-size": "13px", "font-weight": 550 }}>create study</span>
     </button>
   )
 }
 
-function EmptyHero(props: { onChoose: () => void }): JSX.Element {
+function EmptyHero(props: { onCreate: () => void; onOpen: () => void }): JSX.Element {
   return (
     <div
       class="thesis-fade-in"
@@ -915,7 +906,7 @@ function EmptyHero(props: { onChoose: () => void }): JSX.Element {
           color: "var(--color-text)",
         }}
       >
-        Start a project
+        Begin a study
       </h1>
       <p
         style={{
@@ -927,29 +918,16 @@ function EmptyHero(props: { onChoose: () => void }): JSX.Element {
           margin: 0,
         }}
       >
-        Pick a folder to work in — your sessions stay organized around it.
+        Create a guided OpenScience–SMAIRT study, or adopt research that already exists.
       </p>
       <div style={{ display: "flex", gap: "10px", "margin-top": "8px" }}>
-        <button
-          onClick={props.onChoose}
-          style={{
-            all: "unset",
-            cursor: "pointer",
-            display: "inline-flex",
-            "align-items": "center",
-            gap: "8px",
-            padding: "12px 22px",
-            "border-radius": "4px",
-            background: "var(--color-accent)",
-            color: "var(--color-on-accent)",
-            "font-family": FONT_SANS,
-            "font-size": "14px",
-            "font-weight": 400,
-            "box-shadow": "var(--shadow-md)",
-          }}
-        >
+        <button class="os-button os-button--primary" onClick={props.onCreate}>
+          <IconPlus size={14} strokeWidth={1.7} />
+          create study
+        </button>
+        <button class="os-button" onClick={props.onOpen}>
           <IconFolder size={14} strokeWidth={1.5} />
-          open folder…
+          open or adopt
         </button>
       </div>
       <div
