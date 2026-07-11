@@ -57,7 +57,7 @@ import {
 import { StatusDot, type StatusKind } from "@/thesis/shared/StatusDot"
 import { BlinkCursor } from "@/thesis/shared/AsciiSpinner"
 
-const RIGHT_PANE_WIDTH_KEY = "thesis-right-pane-width-v1"
+const RIGHT_PANE_WIDTH_KEY = "thesis-right-pane-width-v2"
 const MIN_PANE_WIDTH = 280
 const MAX_PANE_WIDTH = 880
 const GITHUB_SETTINGS_URL = URLS.githubIntegration
@@ -67,7 +67,7 @@ function readSavedWidth(): number {
     const v = Number(localStorage.getItem(RIGHT_PANE_WIDTH_KEY))
     if (Number.isFinite(v) && v >= MIN_PANE_WIDTH && v <= MAX_PANE_WIDTH) return v
   } catch {}
-  return 360
+  return 600
 }
 
 export function RightPane(): JSX.Element {
@@ -152,7 +152,8 @@ export function RightPane(): JSX.Element {
           display: "flex",
           "flex-direction": "column",
           "border-left": "1px solid var(--color-border)",
-          background: "var(--color-bg-subtle)",
+          background: "color-mix(in srgb, var(--color-bg-subtle) 82%, transparent)",
+          "backdrop-filter": "blur(24px) saturate(1.18)",
           "min-width": `${MIN_PANE_WIDTH}px`,
           position: "relative",
         }}

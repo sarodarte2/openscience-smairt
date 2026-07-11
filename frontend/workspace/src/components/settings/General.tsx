@@ -1,6 +1,6 @@
 // General — Account, Model defaults, and Licensing, plus the appearance/theme
 // controls. Everything here is wired to a real endpoint:
-//   • Account   → client.account.get / client.account.logout, billing link.
+//   • Account   → client.account.get / client.account.logout.
 //   • Model      → global config `model` / `small_model` (client.global.config.update
 //                  via useGlobalSync().updateConfig) + the reasoning effort store.
 //   • Licensing  → /settings/preferences (real JSON store, persisted to ~/.openscience).
@@ -14,7 +14,6 @@ import { useGlobalSync } from "@/context/global-sync"
 import { useModels } from "@/context/models"
 import { usePlatform } from "@/context/platform"
 import { useServer } from "@/context/server"
-import { URLS } from "@/config/urls"
 import { FONT_CODE, FONT_SANS } from "@/styles/tokens"
 import { AppearanceSections } from "../settings-general"
 import { settingsApi } from "./api"
@@ -120,7 +119,7 @@ export default function General() {
       <div class="sticky top-0 z-10 bg-[linear-gradient(to_bottom,var(--surface-raised-stronger-non-alpha)_calc(100%_-_24px),transparent)]">
         <div class="flex flex-col gap-1 pt-8 pb-8 max-w-[760px]">
           <h2 class="text-16-medium text-text-strong">General</h2>
-          <p class="text-13-regular text-text-weak">Your account, default models, licensing, and appearance.</p>
+          <p class="text-13-regular text-text-weak">Your identity, default models, licensing, and appearance.</p>
         </div>
       </div>
 
@@ -141,7 +140,7 @@ export default function General() {
         </Show>
 
         {/* Account */}
-        <Section title="Account" description="Your OpenScience identity and subscription.">
+        <Section title="Account" description="Optional identity information for connected organizational services.">
           <div class="border border-border-weak-base rounded-[4px] overflow-hidden bg-surface-base/40">
             <Row title="Email">
               <span class="text-13-regular text-text-strong">
@@ -156,11 +155,6 @@ export default function General() {
                 <span class="text-13-regular text-text-strong">{org()}</span>
               </Row>
             </Show>
-            <Row title="Billing" description="Manage your subscription, wallet, and invoices.">
-              <Button size="small" variant="secondary" onClick={() => platform.openLink(URLS.dashboardCli)}>
-                manage billing
-              </Button>
-            </Row>
             <Row title="Session" description="Disconnect this machine from OpenScience.">
               <Button
                 size="small"

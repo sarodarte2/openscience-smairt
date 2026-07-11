@@ -9,18 +9,19 @@ import { needsOnboarding, runOnboarding, isConfigured } from "../onboard"
 import fs from "fs/promises"
 import os from "os"
 import path from "path"
+import { spawn, type ChildProcess } from "child_process"
+import { fileURLToPath } from "url"
+import { Installation } from "../../installation"
 
-// macOS TCC probe: try to read ~/Desktop, which is one of the canonical
-// dirs blocked unless the running binary has Full Disk Access. An empty
-// Desktop dir is rare enough that we treat 0-entries OR EACCES/EPERM as
-// "FDA missing" — both are actionable signals on the user's end.
+// macOS TCC probe: a successful read is sufficient. An empty Desktop is a
+// valid state and must not be reported as a permissions failure.
 async function probeMacFda(): Promise<{ blocked: boolean; reason?: string }> {
   if (process.platform !== "darwin") return { blocked: false }
   const desktop = path.join(os.homedir(), "Desktop")
   try {
     const entries = await fs.readdir(desktop)
-    if (entries.length > 0) return { blocked: false }
-    return { blocked: true, reason: "openscience returned 0 entries for ~/Desktop (TCC likely blocking)" }
+    void entries
+    return { blocked: false }
   } catch (err: any) {
     if (err?.code === "EACCES" || err?.code === "EPERM") {
       return { blocked: true, reason: err.message }
@@ -60,7 +61,7 @@ async function announceFdaIfNeeded() {
 export const WebCommand = cmd({
   // Default command: bare `openscience` and `openscience web` both open the
   // workspace in the browser. An optional [project] path runs it in that dir.
-  command: ["web", "$0 [project]"],
+  command: ["web [project]", "$0 [project]"],
   builder: (yargs) =>
     withNetworkOptions(yargs).positional("project", {
       type: "string",
@@ -145,13 +146,26 @@ export const WebCommand = cmd({
     }
 
     const server = Server.listen(opts)
+    let workspace: ChildProcess | undefined
 
     const base = `http://localhost:${server.port}`
-    UI.println(UI.Style.TEXT_INFO_BOLD + "  Web interface:    ", UI.Style.TEXT_NORMAL, base)
+    const localWorkspace = Installation.isLocal()
+      ? await startLocalWorkspace({ apiPort: server.port! }).catch((error) => {
+          UI.println(
+            UI.Style.TEXT_WARNING_BOLD + "  ⚠  Workspace dev server did not start: ",
+            UI.Style.TEXT_NORMAL,
+            error instanceof Error ? error.message : String(error),
+          )
+          return undefined
+        })
+      : undefined
+    workspace = localWorkspace?.process
+    const interfaceUrl = localWorkspace?.url ?? base
+    UI.println(UI.Style.TEXT_INFO_BOLD + "  Web interface:    ", UI.Style.TEXT_NORMAL, interfaceUrl)
     UI.empty()
     UI.println(UI.Style.TEXT_DIM, "  Opening your browser… if it doesn't open, visit the URL above.")
 
-    openUrl(base)
+    openUrl(interfaceUrl)
 
     // macOS-only: warn the user (and pop System Settings) if Full Disk
     // Access is missing — without it the folder picker and file tree silently
@@ -173,6 +187,7 @@ export const WebCommand = cmd({
     const watchdog = setTimeout(() => process.exit(0), 2000)
     watchdog.unref?.()
     try {
+      workspace?.kill("SIGTERM")
       await server.stop(true)
     } catch {
       // ignore — exiting regardless
@@ -180,3 +195,39 @@ export const WebCommand = cmd({
     process.exit(0)
   },
 })
+
+async function startLocalWorkspace(input: { apiPort: number }) {
+  const repositoryRoot = fileURLToPath(new URL("../../../../../", import.meta.url))
+  const workspaceRoot = path.join(repositoryRoot, "frontend/workspace")
+  const configuredPort = Number(process.env.OPENSCIENCE_WORKSPACE_PORT ?? "3000")
+  const port = Number.isInteger(configuredPort) && configuredPort > 0 && configuredPort < 65536 ? configuredPort : 3000
+  if (input.apiPort === 4096) {
+    const existing = await fetch(`http://127.0.0.1:${port}`, { signal: AbortSignal.timeout(500) }).catch(() => null)
+    if (existing?.ok) return { process: undefined, url: `http://localhost:${port}` }
+  }
+  const child = spawn(
+    process.execPath,
+    ["run", "--cwd", workspaceRoot, "dev", "--", "--port", String(port), "--strictPort"],
+    {
+      cwd: repositoryRoot,
+      stdio: "inherit",
+      env: {
+        ...process.env,
+        VITE_OPENSCIENCE_SERVER_HOST: "localhost",
+        VITE_OPENSCIENCE_SERVER_PORT: String(input.apiPort),
+      },
+    },
+  )
+  await new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(resolve, 900)
+    child.once("error", (error) => {
+      clearTimeout(timer)
+      reject(error)
+    })
+    child.once("exit", (code) => {
+      clearTimeout(timer)
+      reject(new Error(`Vite exited before startup (${code ?? "signal"})`))
+    })
+  })
+  return { process: child, url: `http://localhost:${port}` }
+}

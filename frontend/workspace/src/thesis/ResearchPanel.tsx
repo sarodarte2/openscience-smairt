@@ -1,6 +1,9 @@
 import { createResource, createSignal, For, Match, onCleanup, Show, Switch, type JSX } from "solid-js"
 import { createStore } from "solid-js/store"
 import { useSDK } from "@/context/sdk"
+import { useDialog } from "@synsci/ui/context/dialog"
+import { openSetupDialog } from "@/thesis/SetupDialog"
+import { DialogSettings } from "@/components/dialog-settings"
 import { FONT_MONO, FONT_SANS } from "@/styles/tokens"
 import { IconBookOpen, IconCheckCircle, IconRefresh } from "@/thesis/shared/Icon"
 import { IterationComposer } from "@/thesis/IterationComposer"
@@ -56,6 +59,7 @@ async function response<T>(request: Promise<Response>): Promise<T> {
 
 export function ResearchPanel(): JSX.Element {
   const sdk = useSDK()
+  const dialog = useDialog()
   const endpoint = (path = "") =>
     `${sdk.url.replace(/\/$/, "")}/research${path}?directory=${encodeURIComponent(sdk.directory)}`
   const [status, { refetch }] = createResource(() => response<ResearchStatus>(fetch(endpoint())))
@@ -98,6 +102,9 @@ export function ResearchPanel(): JSX.Element {
   const [isolatingTrack, setIsolatingTrack] = createSignal("")
   const [environmentNotice, setEnvironmentNotice] = createSignal("")
   const [liveOperation, setLiveOperation] = createSignal<{ kind: string; state: string }>()
+  const [setupElapsed, setSetupElapsed] = createSignal(0)
+  let setupAbort: AbortController | undefined
+  let setupTimer: ReturnType<typeof setInterval> | undefined
 
   const subscriptions = [
     sdk.event.on("research.operation.updated", (event) => {
@@ -117,11 +124,18 @@ export function ResearchPanel(): JSX.Element {
     }),
   ]
   onCleanup(() => subscriptions.forEach((unsubscribe) => unsubscribe()))
+  onCleanup(() => {
+    if (setupTimer) clearInterval(setupTimer)
+    setupAbort?.abort()
+  })
 
   const initialize = async (event: SubmitEvent) => {
     event.preventDefault()
     setBusy(true)
     setError("")
+    setSetupElapsed(0)
+    setupAbort = new AbortController()
+    setupTimer = setInterval(() => setSetupElapsed((value) => value + 1), 1000)
     try {
       await response(
         fetch(endpoint("/initialize"), {
@@ -134,15 +148,25 @@ export function ResearchPanel(): JSX.Element {
             passphrase: setup.passphrase || undefined,
             humanConfirmed: true,
           }),
+          signal: setupAbort.signal,
         }),
       )
       setSetup("passphrase", "")
       await refetch()
     } catch (cause) {
+      if (cause instanceof DOMException && cause.name === "AbortError") {
+        setError(
+          "Stopped waiting for project setup. The server may still finish the current stage; refresh status before retrying.",
+        )
+        return
+      }
       const message = cause instanceof Error ? cause.message : String(cause)
       if (message.toLowerCase().includes("passphrase")) setNeedsPassphrase(true)
       setError(message)
     } finally {
+      if (setupTimer) clearInterval(setupTimer)
+      setupTimer = undefined
+      setupAbort = undefined
       setBusy(false)
     }
   }
@@ -210,6 +234,9 @@ export function ResearchPanel(): JSX.Element {
           style={iconButton}
         >
           <IconRefresh size={13} strokeWidth={1.5} />
+        </button>
+        <button type="button" onClick={() => openSetupDialog(dialog)} style={setupButton}>
+          Models & connectors
         </button>
       </header>
 
@@ -283,7 +310,30 @@ export function ResearchPanel(): JSX.Element {
                 </label>
               </Show>
               <button type="submit" disabled={busy()} style={primaryButton}>
-                {busy() ? "Preparing project…" : "Set up research project"}
+                {busy()
+                  ? setup.createCondaEnvironment
+                    ? `Creating signed project and Conda environment · ${setupElapsed()}s`
+                    : `Creating signed project · ${setupElapsed()}s`
+                  : "Set up research project"}
+              </button>
+              <Show when={busy()}>
+                <div style={progressRow} role="status" aria-live="polite">
+                  <span>
+                    {setup.createCondaEnvironment
+                      ? "Conda may take several minutes on first use. The repository is validated before records are written."
+                      : "Writing the signed project record and hidden core track."}
+                  </span>
+                  <button type="button" style={cancelButton} onClick={() => setupAbort?.abort()}>
+                    Cancel
+                  </button>
+                </div>
+              </Show>
+              <button
+                type="button"
+                style={secondaryButton}
+                onClick={() => dialog.show(() => <DialogSettings initialPanel="credentials" />)}
+              >
+                Configure models, keys, local endpoints, or connectors
               </button>
             </form>
           </Match>
@@ -514,14 +564,22 @@ export function ResearchPanel(): JSX.Element {
   )
 }
 
-const shell: JSX.CSSProperties = { flex: 1, "min-height": 0, display: "flex", "flex-direction": "column" }
+const shell: JSX.CSSProperties = {
+  flex: 1,
+  "min-height": 0,
+  display: "flex",
+  "flex-direction": "column",
+  background:
+    "radial-gradient(circle at 12% 0%, color-mix(in srgb, var(--color-accent) 8%, transparent), transparent 32%), var(--color-bg)",
+}
 const header: JSX.CSSProperties = {
   display: "flex",
   "align-items": "center",
   "justify-content": "space-between",
   padding: "12px 14px",
   "border-bottom": "1px solid var(--color-border)",
-  background: "var(--color-bg)",
+  background: "color-mix(in srgb, var(--color-bg) 82%, transparent)",
+  "backdrop-filter": "blur(20px) saturate(1.15)",
 }
 const body: JSX.CSSProperties = {
   flex: 1,
@@ -617,6 +675,40 @@ const iconButton: JSX.CSSProperties = {
   color: "var(--color-text-muted)",
   cursor: "pointer",
   padding: "6px",
+}
+const setupButton: JSX.CSSProperties = {
+  border: "1px solid color-mix(in srgb, var(--color-accent) 25%, var(--color-border))",
+  "border-radius": "999px",
+  padding: "6px 10px",
+  background: "color-mix(in srgb, var(--color-surface-solid) 78%, transparent)",
+  color: "var(--color-text)",
+  "font-family": FONT_MONO,
+  "font-size": "10px",
+  cursor: "pointer",
+}
+const progressRow: JSX.CSSProperties = {
+  display: "flex",
+  gap: "10px",
+  "align-items": "center",
+  "justify-content": "space-between",
+  padding: "9px 10px",
+  "border-radius": "7px",
+  background: "var(--color-accent-subtle)",
+  color: "var(--color-text-muted)",
+  "font-family": FONT_SANS,
+  "font-size": "11px",
+  "line-height": 1.45,
+}
+const cancelButton: JSX.CSSProperties = {
+  border: "1px solid var(--color-border)",
+  "border-radius": "999px",
+  padding: "5px 9px",
+  background: "var(--color-surface-solid)",
+  color: "var(--color-text)",
+  cursor: "pointer",
+  "font-family": FONT_MONO,
+  "font-size": "10px",
+  "flex-shrink": 0,
 }
 const projectCard: JSX.CSSProperties = {
   padding: "14px",

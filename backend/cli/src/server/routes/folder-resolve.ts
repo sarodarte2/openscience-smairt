@@ -165,7 +165,7 @@ export const FolderResolveRoutes = lazy(() =>
       if (process.platform !== "darwin") return c.json({ fda: true })
       const desktop = path.join(HOME, "Desktop")
       const r = await listDirectory(desktop)
-      const fda = r.ok && (r.entries?.length ?? 0) > 0
+      const fda = r.ok
       return c.json({ fda, reason: fda ? undefined : (r.error ?? "Desktop unreadable (TCC blocking)") })
     })
     .get("/dialog", async (c) => {

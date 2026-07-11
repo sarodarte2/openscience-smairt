@@ -1,6 +1,6 @@
 // First-run setup — the browser equivalent of the terminal `openscience init`
-// wizard (cli/onboard.ts). Managed-first, but bring-your-own-key and "not now"
-// stay one click away; OpenScience never requires an account. Built on the
+// wizard (cli/onboard.ts). Local and bring-your-own-key paths lead; managed
+// services remain optional. Built on the
 // @synsci/ui Dialog kit.
 //
 //   • Atlas managed → open the dashboard sign-in in a new tab, paste the `thk_`
@@ -8,8 +8,8 @@
 //   • Your own keys → the real Credentials add-key flow (auth.set + global.sync).
 //   • Not now → dismiss + persist a localStorage marker so we don't re-prompt.
 //
-// The one hosted checkout that leaves the app is "add funds"; everything else
-// completes in-app without a terminal.
+// Managed-service sign-in is the only hosted handoff; local and BYOK setup
+// complete in-app without a terminal.
 import { type JSX, For, Show, createSignal } from "solid-js"
 import { Dialog } from "@synsci/ui/dialog"
 import { useDialog } from "@synsci/ui/context/dialog"
@@ -20,6 +20,7 @@ import { usePlatform } from "@/context/platform"
 import { URLS } from "@/config/urls"
 import { FONT_MONO, FONT_SANS } from "@/styles/tokens"
 import { settingsApi } from "@/components/settings/api"
+import { DialogSettings } from "@/components/dialog-settings"
 
 export const SETUP_DISMISS_KEY = "openscience.setup.dismissed"
 
@@ -70,6 +71,11 @@ export function SetupDialog(props: { onDismiss?: () => void }): JSX.Element {
     } catch {}
     props.onDismiss?.()
     dialog.close()
+  }
+
+  const openSettings = (initialPanel: "local-models" | "connectors") => {
+    dialog.close()
+    queueMicrotask(() => dialog.show(() => <DialogSettings initialPanel={initialPanel} />))
   }
 
   const openManaged = () => {
@@ -149,25 +155,35 @@ export function SetupDialog(props: { onDismiss?: () => void }): JSX.Element {
 
         {/* ── Choose a path ── */}
         <Show when={view() === "choose"}>
-          <p style={intro()}>Pick how to power your models. You can change this anytime in Settings.</p>
+          <p style={intro()}>Choose how this machine should run research. You can change this anytime in Settings.</p>
           <div style={{ display: "flex", "flex-direction": "column", gap: "8px" }}>
             <ChoiceCard
-              title="Atlas managed"
+              title="Your own provider key"
               hint="recommended"
-              body="Prepaid wallet, zero setup. Metered credits — no API keys needed."
-              onClick={openManaged}
-            />
-            <ChoiceCard
-              title="Your own keys"
-              body="Bring an Anthropic / OpenAI / Google key. Stored on this machine, free and unmetered here."
+              body="Connect OpenAI, Anthropic, Google, OpenRouter, or another provider. Keys stay on this machine."
               onClick={() => {
                 setError(undefined)
                 setView("byok")
               }}
             />
             <ChoiceCard
+              title="Local or OpenAI-compatible model"
+              body="Use Ollama, LM Studio, a laboratory gateway, or another compatible endpoint."
+              onClick={() => openSettings("local-models")}
+            />
+            <ChoiceCard
+              title="Research connectors"
+              body="Configure MCP and scientific data connectors independently from model access."
+              onClick={() => openSettings("connectors")}
+            />
+            <ChoiceCard
+              title="Managed models (optional)"
+              body="Use Synthetic Sciences hosted models if your organization has chosen that service."
+              onClick={openManaged}
+            />
+            <ChoiceCard
               title="Not now"
-              body="Explore first with the free demo models. Set up anytime."
+              body="Open the workspace without generation. Configure a model before asking the assistant to run."
               muted
               onClick={dismiss}
             />
@@ -219,15 +235,12 @@ export function SetupDialog(props: { onDismiss?: () => void }): JSX.Element {
         {/* ── Managed connected ── */}
         <Show when={view() === "done"}>
           <p style={intro()}>
-            Connected to Atlas.
-            <Show when={balance() !== undefined}> Wallet balance {money(balance()!)}.</Show> Managed models are ready.
+            Managed models are connected.
+            <Show when={balance() !== undefined}> Available balance {money(balance()!)}.</Show>
           </p>
           <div style={{ display: "flex", gap: "8px", "align-items": "center" }}>
             <Button variant="primary" size="small" onClick={() => dialog.close()}>
               start researching
-            </Button>
-            <Button variant="ghost" size="small" onClick={() => platform.openLink(URLS.dashboardCli)}>
-              add funds
             </Button>
           </div>
         </Show>
@@ -316,13 +329,20 @@ function ChoiceCard(props: {
         "flex-direction": "column",
         gap: "3px",
         padding: "12px 14px",
-        "border-radius": "4px",
+        "border-radius": "13px",
         border: "1px solid var(--color-border)",
-        background: props.muted ? "transparent" : "var(--color-surface-solid, transparent)",
-        transition: "border-color 120ms ease, background 120ms ease",
+        background: props.muted ? "transparent" : "color-mix(in srgb, var(--color-surface-solid) 76%, transparent)",
+        "box-shadow": props.muted ? "none" : "inset 0 1px 0 rgba(255,255,255,.08)",
+        transition: "border-color 160ms ease, background 160ms ease, transform 160ms ease",
       }}
-      onMouseEnter={(e) => (e.currentTarget.style.borderColor = "var(--color-border-strong)")}
-      onMouseLeave={(e) => (e.currentTarget.style.borderColor = "var(--color-border)")}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.borderColor = "var(--color-border-strong)"
+        e.currentTarget.style.transform = "translateY(-1px)"
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.borderColor = "var(--color-border)"
+        e.currentTarget.style.transform = "translateY(0)"
+      }}
     >
       <span style={{ display: "flex", "align-items": "center", gap: "8px" }}>
         <span class="text-14-medium text-text-strong">{props.title}</span>

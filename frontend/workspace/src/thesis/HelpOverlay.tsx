@@ -14,7 +14,7 @@ const SECTIONS: Array<{ title: string; rows: Array<{ keys: string[]; label: stri
     title: "navigation",
     rows: [
       { keys: ["⌘", "K"], label: "command palette" },
-      { keys: ["⌘", "N"], label: "open folder / new project" },
+      { keys: ["⌘", "N"], label: "open project folder" },
       { keys: ["?"], label: "open this help" },
     ],
   },

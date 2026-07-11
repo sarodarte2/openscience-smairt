@@ -250,7 +250,7 @@ export default function Home(): JSX.Element {
           }}
         >
           <IconPlus size={12} strokeWidth={2} />
-          new project
+          open project folder
         </button>
         <HeaderIconButton onClick={cycleScheme} title="toggle theme">
           <Show when={isDark()} fallback={<IconMoon size={13} strokeWidth={1.5} />}>
@@ -884,7 +884,7 @@ function NewProjectCard(props: { onClick: () => void }): JSX.Element {
       }}
     >
       <IconPlus size={15} strokeWidth={2} />
-      <span style={{ "font-family": FONT_SANS, "font-size": "13px", "font-weight": 400 }}>new project</span>
+      <span style={{ "font-family": FONT_SANS, "font-size": "13px", "font-weight": 400 }}>open project folder</span>
     </button>
   )
 }

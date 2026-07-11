@@ -97,13 +97,14 @@ You need [Bun](https://bun.sh) 1.3 or newer.
 
 ```bash
 bun install
-bun dev
+bun dev web /path/to/research-project
 bun run typecheck
 bun run --cwd backend/cli test
 bun run --cwd backend/cli build
 ```
 
-`bun dev` runs the workspace from source, and `bun run --cwd backend/cli build` produces the platform binaries.
+`bun dev web <project>` starts both the local API and Vite workspace from source, opens the selected repository, and
+stops both processes together. `bun run --cwd backend/cli build` produces the platform binaries.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for how the system fits together, [CONTRIBUTING.md](CONTRIBUTING.md) for how to contribute, [AGENTS.md](AGENTS.md) for the style guide, and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for community standards.
 

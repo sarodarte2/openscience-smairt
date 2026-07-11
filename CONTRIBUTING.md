@@ -18,14 +18,15 @@ You need Bun 1.3 or newer. Install dependencies and run the CLI from source:
 
 ```bash
 bun install
-bun dev
+bun dev web /path/to/research-project
 ```
 
-`bun dev` is the local equivalent of the built `openscience` command. It runs against the `backend/cli` directory by default. To run it elsewhere:
+`bun dev` is the local equivalent of the built `openscience` command. The source `web` command starts both the API and
+Vite workspace. Always name the repository you intend to open:
 
 ```bash
-bun dev <directory>     # run in a specific directory
-bun dev .               # run in the repo root
+bun dev web <directory> # start API + workspace for a specific directory
+bun dev web .           # open the repository root
 ```
 
 Common commands work the same in dev and in the built binary:
@@ -33,7 +34,7 @@ Common commands work the same in dev and in the built binary:
 ```bash
 bun dev --help          # list commands
 bun dev serve           # headless API server (port 4096 by default)
-bun dev web             # start the server and open the workspace
+bun dev web <project>   # start API + Vite and open the workspace
 ```
 
 ### Checks
@@ -70,14 +71,18 @@ Replace `<platform>` with your platform, for example `darwin-arm64` or `linux-x6
 
 ### Working on the workspace UI
 
-Start the server, then run the UI dev server:
+Normally `bun dev web <project>` starts both processes. To debug them independently, start the API from the project
+directory and Vite from the source repository:
 
 ```bash
-bun dev serve
+cd /path/to/research-project
+bun run --conditions=browser /path/to/openscience/backend/cli/src/index.ts serve --port 4096
+
+cd /path/to/openscience
 bun run --cwd frontend/workspace dev
 ```
 
-The UI dev server prints its local URL (usually http://localhost:5173). The API server must be running for full functionality.
+The UI dev server uses http://localhost:3000. The API server must be running on port 4096 for full functionality.
 
 If you change the API or SDK (for example `backend/cli/src/server/server.ts`), run `./tooling/repo/generate.ts` to regenerate the SDK and related files.
 

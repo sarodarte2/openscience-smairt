@@ -921,7 +921,7 @@ html[data-color-scheme="dark"] .thesis-agent-orbit {
   line-height: 1.5;
   color: var(--color-text-muted);
   padding: 10px 14px;
-  border-radius: var(--radius);
+  border-radius: 12px;
   border: 1px solid var(--color-border);
   background: var(--color-surface-solid);
   cursor: pointer;
@@ -940,8 +940,8 @@ html[data-color-scheme="dark"] .thesis-agent-orbit {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.32);
-  backdrop-filter: blur(2px);
-  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(12px) saturate(1.08);
+  -webkit-backdrop-filter: blur(12px) saturate(1.08);
   z-index: var(--z-overlay);
   animation: thesis-fade-in 200ms ease;
 }
@@ -957,10 +957,14 @@ html[data-color-scheme="dark"] .thesis-overlay {
   left: 50%;
   transform: translate(-50%, -50%);
   z-index: var(--z-modal);
-  background: var(--color-surface-solid);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-md);
+  background: color-mix(in srgb, var(--color-surface-solid) 82%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-border-strong) 62%, transparent);
+  border-radius: 18px;
+  box-shadow:
+    0 24px 80px rgba(0, 0, 0, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(30px) saturate(1.2);
+  -webkit-backdrop-filter: blur(30px) saturate(1.2);
   animation: thesis-scale-in 240ms var(--agent-ease);
   max-width: 90vw;
   max-height: 90vh;
@@ -976,13 +980,28 @@ html[data-color-scheme="dark"] .thesis-overlay {
   bottom: 0;
   width: 460px;
   max-width: 92vw;
-  background: var(--color-surface-solid);
+  background: color-mix(in srgb, var(--color-surface-solid) 84%, transparent);
   border-left: 1px solid var(--color-border);
   box-shadow: var(--shadow-md);
   z-index: var(--z-modal);
   animation: thesis-slide-in-right 240ms var(--agent-ease);
   display: flex;
   flex-direction: column;
+  backdrop-filter: blur(28px) saturate(1.16);
+  -webkit-backdrop-filter: blur(28px) saturate(1.16);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .thesis-overlay,
+  .thesis-modal,
+  .thesis-drawer-right {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  .thesis-modal,
+  .thesis-drawer-right {
+    background: var(--color-surface-solid);
+  }
 }
 
 @keyframes thesis-slide-in-right {

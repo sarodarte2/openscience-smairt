@@ -993,7 +993,8 @@ function ChatWelcome(): JSX.Element {
               "line-height": 1.5,
             }}
           >
-            No model is connected yet — set one up to start, with managed credits or your own key.
+            No model is connected yet. Add your own provider key or choose a local/OpenAI-compatible endpoint before
+            starting.
           </p>
           <button
             type="button"
