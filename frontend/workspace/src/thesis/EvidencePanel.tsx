@@ -49,6 +49,7 @@ export function EvidencePanel(props: { iterations: Iteration[]; disabled?: boole
   const [mode, setMode] = createSignal<"artifact" | "analysis" | "">("")
   const [busy, setBusy] = createSignal(false)
   const [error, setError] = createSignal("")
+  const [mutationKey, setMutationKey] = createSignal("")
   const [artifact, setArtifact] = createStore({
     iterationId: "",
     file: "",
@@ -66,16 +67,23 @@ export function EvidencePanel(props: { iterations: Iteration[]; disabled?: boole
     artifactId: "",
     finalize: false,
   })
+  const open = (value: "artifact" | "analysis") => {
+    setMutationKey("")
+    setError("")
+    setMode(mode() === value ? "" : value)
+  }
 
   const register = async (event: SubmitEvent) => {
     event.preventDefault()
     setBusy(true)
     setError("")
+    const key = mutationKey() || crypto.randomUUID()
+    setMutationKey(key)
     try {
       await response(
         fetch(endpoint("/artifacts"), {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", "Idempotency-Key": key },
           body: JSON.stringify({ ...artifact, runId: artifact.runId || undefined, humanConfirmed: true }),
         }),
       )
@@ -87,6 +95,7 @@ export function EvidencePanel(props: { iterations: Iteration[]; disabled?: boole
         runId: "",
       })
       setMode("")
+      setMutationKey("")
       await refetchArtifacts()
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause))
@@ -99,11 +108,13 @@ export function EvidencePanel(props: { iterations: Iteration[]; disabled?: boole
     event.preventDefault()
     setBusy(true)
     setError("")
+    const key = mutationKey() || crypto.randomUUID()
+    setMutationKey(key)
     try {
       await response(
         fetch(endpoint("/analyses"), {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", "Idempotency-Key": key },
           body: JSON.stringify({
             iterationId: analysis.iterationId,
             title: analysis.title,
@@ -129,6 +140,7 @@ export function EvidencePanel(props: { iterations: Iteration[]; disabled?: boole
         finalize: false,
       })
       setMode("")
+      setMutationKey("")
       await refetchAnalyses()
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause))
@@ -145,20 +157,10 @@ export function EvidencePanel(props: { iterations: Iteration[]; disabled?: boole
           <div style={subtitle}>Artifacts are hashed; interpretations name findings and limitations.</div>
         </div>
         <div style={{ display: "flex", gap: "6px" }}>
-          <button
-            type="button"
-            disabled={props.disabled}
-            style={button}
-            onClick={() => setMode(mode() === "artifact" ? "" : "artifact")}
-          >
+          <button type="button" disabled={props.disabled} style={button} onClick={() => open("artifact")}>
             Register artifact
           </button>
-          <button
-            type="button"
-            disabled={props.disabled}
-            style={button}
-            onClick={() => setMode(mode() === "analysis" ? "" : "analysis")}
-          >
+          <button type="button" disabled={props.disabled} style={button} onClick={() => open("analysis")}>
             Record analysis
           </button>
         </div>

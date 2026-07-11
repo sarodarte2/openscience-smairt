@@ -15,6 +15,7 @@ import {
   type TrackEnvironment,
 } from "@/thesis/EnvironmentIsolation"
 import { EvidencePanel } from "@/thesis/EvidencePanel"
+import { DecisionPanel } from "@/thesis/DecisionPanel"
 
 interface ResearchProject {
   id: string
@@ -555,6 +556,15 @@ export function ResearchPanel(): JSX.Element {
             </div>
             <EvidencePanel
               iterations={(iterations() ?? []).map((item) => ({ id: item.id, title: item.title }))}
+              disabled={status()?.readOnly}
+            />
+            <DecisionPanel
+              iterations={(iterations() ?? []).map((item) => ({
+                id: item.id,
+                trackId: item.trackId,
+                title: item.title,
+              }))}
+              tracks={(tracks() ?? []).map((item) => ({ id: item.id, title: item.title, hidden: item.hidden }))}
               disabled={status()?.readOnly}
             />
           </Match>
